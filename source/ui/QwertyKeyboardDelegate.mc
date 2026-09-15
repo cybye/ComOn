@@ -69,14 +69,8 @@ class QwertyKeyboardDelegate extends WatchUi.BehaviorDelegate {
                 } else if (id.equals("TOGGLE_MODE")) {
                     _view.isSymbols = !_view.isSymbols;
                     _view.buildKeyLayout();
-                } else if (id.equals("TOGGLE_LAYOUT")) {
-                    _view.isQwerty = !_view.isQwerty;
-                    _view.buildKeyLayout();
                 } else if (id.equals("SEND")) {
                     sendCurrentText();
-                    return true;
-                } else if (id.equals("CANCEL")) {
-                    WatchUi.popView(WatchUi.SLIDE_RIGHT);
                     return true;
                 }
 
