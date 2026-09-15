@@ -44,3 +44,4 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }
+

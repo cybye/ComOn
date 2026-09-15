@@ -6,10 +6,17 @@ import Toybox.System;
 
 class DashboardView extends WatchUi.View {
     private var _timer as Timer.Timer?;
+    private var _vectorFont as Graphics.VectorFont?;
     public var pageIndex as Number = 0; // 0 = Chat / Dashboard, 1 = Telemetrie Detail
 
     function initialize() {
         View.initialize();
+        if (Graphics has :getVectorFont) {
+            _vectorFont = Graphics.getVectorFont({
+                :face => "RobotoRegular",
+                :size => 22
+            });
+        }
     }
 
     function onShow() as Void {
@@ -38,7 +45,7 @@ class DashboardView extends WatchUi.View {
             drawTelemetryPage(dc);
         }
 
-        drawRadialNavigation(dc);
+        drawNavigationIndicators(dc);
     }
 
     // -----------------------------------------------------------------
@@ -105,10 +112,10 @@ class DashboardView extends WatchUi.View {
         dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cardY + 105, fontXtiny, "Absender: " + bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // 3. Subtle bottom summary line
+        // 3. Subtle bottom summary line (positioned higher to leave room for bottom nav)
         var bat = tlm.getBatteryPercent().toNumber();
-        dc.setColor(0x555555, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h - 52, fontXtiny, "Akku: " + bat + "%", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(0x666666, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, h - 85, fontXtiny, "Batt: " + bat + "%", Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // -----------------------------------------------------------------
@@ -152,8 +159,9 @@ class DashboardView extends WatchUi.View {
         drawTelemetryBox(dc, box2X, row1Y, boxW, boxH, "GPS", gpsBg);
         var gpsText = tlm.hasGpsFix ? "FIX OK" : "SUCHE...";
         var gpsColor = tlm.hasGpsFix ? Graphics.COLOR_GREEN : Graphics.COLOR_ORANGE;
+        var gpsFont = tlm.hasGpsFix ? fontTiny : fontXtiny;
         dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row1Y + 34, fontTiny, gpsText, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box2X + (boxW/2), row1Y + 36, gpsFont, gpsText, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Box 3: SCHRITTE
         drawTelemetryBox(dc, box1X, row2Y, boxW, boxH, "SCHRITTE", 0x14161c);
@@ -170,52 +178,70 @@ class DashboardView extends WatchUi.View {
     }
 
     // -----------------------------------------------------------------
-    // RADIAL NAVIGATION LABELS (Along curved bezel at 2 and 4 o'clock)
+    // NAVIGATION INDICATORS (Standard Garmin triangles + 2 o'clock START cue)
     // -----------------------------------------------------------------
-    private function drawRadialNavigation(dc as Graphics.Dc) as Void {
+    private function drawNavigationIndicators(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
         var cx = w / 2;
         var cy = h / 2;
-        var r = (w / 2) - 4; // Right on the outer perimeter
+        var r = (w / 2) - 4;
 
         var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
 
         // -------------------------------------------------------------
-        // BUTTON AT 2 O'CLOCK (START / SELECT)
+        // 1. STANDARD GARMIN PAGE NAVIGATION TRIANGLES (No text)
         // -------------------------------------------------------------
-        var btn2Label = (pageIndex == 0) ? "MENÜ" : "POS";
-        var btn2Color = (pageIndex == 0) ? 0x3882e0 : 0x27ae60; // Blue for Menu, Green for Pos
+        var triW = 12;
+        var triH = 7;
+        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
 
-        // Draw curved accent arc on the perimeter (approx 20 deg arc at 2 o'clock / -30 deg)
-        dc.setColor(btn2Color, Graphics.COLOR_TRANSPARENT);
+        if (pageIndex == 0) {
+            // Main page: Down triangle at bottom center
+            var triY = h - 28;
+            dc.fillPolygon([
+                [cx - (triW / 2), triY],
+                [cx + (triW / 2), triY],
+                [cx, triY + triH]
+            ]);
+        } else {
+            // Data page: Up triangle at top center
+            var triY = 18;
+            dc.fillPolygon([
+                [cx - (triW / 2), triY + triH],
+                [cx + (triW / 2), triY + triH],
+                [cx, triY]
+            ]);
+        }
+
+        // -------------------------------------------------------------
+        // 2. BUTTON AT 2 O'CLOCK (START / SELECT)
+        // -------------------------------------------------------------
+        var btnLabel = (pageIndex == 0) ? "MENÜ" : "POS";
+        var accentColor = 0xff9500; // Consistent Garmin Fenix Orange Accent
+
+        // Curved accent arc at 2 o'clock (centered at 30 deg: from 45 deg to 15 deg CLOCKWISE)
+        dc.setColor(accentColor, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(3);
-        dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 350, 310);
+        dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 45, 15);
         dc.setPenWidth(1);
 
-        // Draw small label hugging the circular boundary
-        // Position at ~2 o'clock: x ~ 430, y ~ 125
-        dc.setColor(btn2Color, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w - 24, 116, fontXtiny, btn2Label, Graphics.TEXT_JUSTIFY_RIGHT);
-        dc.fillCircle(w - 14, 126, 3); // Subtle tick indicator
-
-        // -------------------------------------------------------------
-        // BUTTON AT 4 O'CLOCK (DATA / CHAT / DOWN)
-        // -------------------------------------------------------------
-        var btn4Label = (pageIndex == 0) ? "DATA" : "CHAT";
-        var btn4Color = (pageIndex == 0) ? 0x00d4ff : 0xff9500; // Cyan for Data, Orange for Chat
-
-        // Draw curved accent arc on the perimeter (approx 20 deg arc at 4 o'clock / +30 deg)
-        dc.setColor(btn4Color, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(3);
-        dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 50, 10);
-        dc.setPenWidth(1);
-
-        // Draw small label hugging the circular boundary
-        // Position at ~4 o'clock: x ~ 430, y ~ 305
-        dc.setColor(btn4Color, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w - 24, 305, fontXtiny, btn4Label, Graphics.TEXT_JUSTIFY_RIGHT);
-        dc.fillCircle(w - 14, 315, 3); // Subtle tick indicator
+        // Draw radial text at 2 o'clock (30 degrees)
+        if (_vectorFont != null && (dc has :drawRadialText)) {
+            dc.drawRadialText(
+                cx,
+                cy,
+                _vectorFont,
+                btnLabel,
+                Graphics.TEXT_JUSTIFY_CENTER,
+                30,
+                r - 18,
+                Graphics.RADIAL_TEXT_DIRECTION_CLOCKWISE
+            );
+        } else {
+            // Fallback if vector font not supported
+            dc.drawText(w - 28, 110, fontXtiny, btnLabel, Graphics.TEXT_JUSTIFY_RIGHT);
+        }
     }
 
     private function drawTelemetryBox(dc as Graphics.Dc, x as Number, y as Number, w as Number, h as Number, title as String, bgColor as Number) as Void {

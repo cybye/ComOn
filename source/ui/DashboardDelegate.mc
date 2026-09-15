@@ -23,27 +23,19 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    //! 4 O'CLOCK BUTTON (BACK / LAP) -> Toggle between Chat & Data
+    //! 4 O'CLOCK BUTTON (BACK / LAP)
     function onBack() as Boolean {
         if (_view.pageIndex == 1) {
             // On Telemetry page: Return to Chat
             _view.pageIndex = 0;
             WatchUi.requestUpdate();
             return true;
-        } else {
-            // On Chat page: Double-click exits, single-click switches to DATA
-            var now = System.getTimer();
-            if (now - _lastBackTime < 1200) {
-                return false; // Standard exit
-            }
-            _lastBackTime = now;
-            _view.pageIndex = 1; // Switch to DATA
-            WatchUi.requestUpdate();
-            return true;
         }
+        // On Chat page: Standard Garmin exit
+        return false;
     }
 
-    //! 7 O'CLOCK BUTTON (DOWN) / Swipe Up
+    //! 7 O'CLOCK BUTTON (DOWN) / Swipe Up -> Go to Data page
     function onNextPage() as Boolean {
         if (_view.pageIndex == 0) {
             _view.pageIndex = 1;
@@ -53,16 +45,14 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    //! 9 O'CLOCK BUTTON (UP) / Swipe Down
+    //! 9 O'CLOCK BUTTON (UP) / Swipe Down -> Go to Chat page
     function onPreviousPage() as Boolean {
         if (_view.pageIndex == 1) {
             _view.pageIndex = 0;
             WatchUi.requestUpdate();
             return true;
-        } else {
-            sendPositionDirect();
-            return true;
         }
+        return false;
     }
 
     //! Explicit key handler
