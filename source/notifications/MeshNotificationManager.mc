@@ -20,7 +20,7 @@ class MeshNotificationManager {
         try {
             Notifications.registerForNotificationMessages(method(:onNotificationReceived));
         } catch (e) {
-            System.println("Register notifications failed: " + e.getErrorMessage());
+            System.println("Register notifications notice");
         }
     }
 
@@ -43,7 +43,8 @@ class MeshNotificationManager {
         try {
             Notifications.showNotification("Mesh: " + sender, "Eingehende Nachricht", options);
         } catch (e) {
-            System.println("showNotification error: " + e.getErrorMessage());
+            System.println("showNotification error");
+            e.printStackTrace();
         }
     }
 

@@ -89,9 +89,9 @@ class DashboardView extends WatchUi.View {
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT); // Cyan
         dc.drawText(cx, targetY, fontXtiny, "[" + ContactManager.getTargetDisplayName() + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
-        // 2. TRUE CENTER: Message Card (Centered at cy = 227)
-        var cardW = (w * 0.76).toNumber();
-        var cardH = 145;
+        // 2. TRUE CENTER: Enlarged Message Card (Centered at cy = 227)
+        var cardW = (w * 0.80).toNumber();
+        var cardH = 172;
         var cardX = cx - (cardW / 2);
         var cardY = cy - (cardH / 2); // Exactly centered vertically!
 
@@ -102,15 +102,28 @@ class DashboardView extends WatchUi.View {
 
         // Header inside card
         dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Orange
-        dc.drawText(cx, cardY + 14, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, cardY + 10, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Main message text
+        // Subtle separator line
+        dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(cardX + 20, cardY + 30, cardX + cardW - 20, cardY + 30);
+
+        // Multi-line message text with dynamic wrapping (up to 4 lines)
+        var maxTextWidth = cardW - 36;
+        var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, 4);
+        var lineHeight = 21;
+        var totalTextH = lines.size() * lineHeight;
+        var availableH = 112; // Height between separator (y+32) and footer (y+144)
+        var startY = cardY + 32 + ((availableH - totalTextH) / 2);
+
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 50, fontTiny, bleMgr.lastReceivedMessage, Graphics.TEXT_JUSTIFY_CENTER);
+        for (var i = 0; i < lines.size(); i++) {
+            dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
+        }
 
-        // Sender
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 105, fontXtiny, "Absender: " + bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
+        // Sender footer
+        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cardY + cardH - 22, fontXtiny, "Absender: " + bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
 
         // 3. Subtle bottom summary line (positioned higher to leave room for bottom nav)
         var bat = tlm.getBatteryPercent().toNumber();
@@ -252,5 +265,80 @@ class DashboardView extends WatchUi.View {
 
         dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x + (w/2), y + 8, Graphics.FONT_SYSTEM_XTINY, title, Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    private function wrapText(dc as Graphics.Dc, text as String, font as Graphics.FontDefinition, maxWidth as Number, maxLines as Number) as Array<String> {
+        var lines = [] as Array<String>;
+        if (text == null || text.length() == 0) {
+            return lines;
+        }
+
+        var words = [] as Array<String>;
+        var currentWord = "";
+        for (var i = 0; i < text.length(); i++) {
+            var ch = text.substring(i, i + 1);
+            if (ch.equals(" ") || ch.equals("\n")) {
+                if (currentWord.length() > 0) {
+                    words.add(currentWord);
+                    currentWord = "";
+                }
+            } else {
+                currentWord += ch;
+            }
+        }
+        if (currentWord.length() > 0) {
+            words.add(currentWord);
+        }
+
+        var currentLine = "";
+        for (var wIdx = 0; wIdx < words.size(); wIdx++) {
+            var word = words[wIdx];
+            var testLine = (currentLine.length() == 0) ? word : (currentLine + " " + word);
+            var testWidth = dc.getTextWidthInPixels(testLine, font);
+
+            if (testWidth <= maxWidth) {
+                currentLine = testLine;
+            } else {
+                if (currentLine.length() > 0) {
+                    lines.add(currentLine);
+                    if (lines.size() >= maxLines) {
+                        currentLine = "";
+                        break;
+                    }
+                }
+                if (dc.getTextWidthInPixels(word, font) > maxWidth) {
+                    var subWord = "";
+                    for (var c = 0; c < word.length(); c++) {
+                        var charStr = word.substring(c, c + 1);
+                        if (dc.getTextWidthInPixels(subWord + charStr, font) <= maxWidth) {
+                            subWord += charStr;
+                        } else {
+                            lines.add(subWord);
+                            subWord = charStr;
+                            if (lines.size() >= maxLines) {
+                                break;
+                            }
+                        }
+                    }
+                    currentLine = subWord;
+                } else {
+                    currentLine = word;
+                }
+            }
+        }
+
+        if (currentLine.length() > 0 && lines.size() < maxLines) {
+            lines.add(currentLine);
+        }
+
+        if (lines.size() == maxLines && words.size() > lines.size()) {
+            var lastIdx = lines.size() - 1;
+            var lastLine = lines[lastIdx];
+            if (dc.getTextWidthInPixels(lastLine + "...", font) <= maxWidth) {
+                lines[lastIdx] = lastLine + "...";
+            }
+        }
+
+        return lines;
     }
 }

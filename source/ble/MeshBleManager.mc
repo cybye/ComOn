@@ -7,22 +7,9 @@ import Toybox.Timer;
 import Toybox.WatchUi;
 
 class MeshBleManager {
-    public const NUS_SERVICE_UUID = BluetoothLowEnergy.stringToUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
-    public const NUS_RX_UUID      = BluetoothLowEnergy.stringToUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
-    public const NUS_TX_UUID      = BluetoothLowEnergy.stringToUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
-
-    private const _nusProfileDef = {
-        :uuid => NUS_SERVICE_UUID,
-        :characteristics => [
-            {
-                :uuid => NUS_RX_UUID
-            },
-            {
-                :uuid => NUS_TX_UUID,
-                :descriptors => [BluetoothLowEnergy.cccdUuid()]
-            }
-        ]
-    };
+    public var nusServiceUuid as BluetoothLowEnergy.Uuid?;
+    public var nusRxUuid      as BluetoothLowEnergy.Uuid?;
+    public var nusTxUuid      as BluetoothLowEnergy.Uuid?;
 
     public var isConnected as Boolean = false;
     public var isScanning as Boolean = false;
@@ -44,13 +31,28 @@ class MeshBleManager {
     }
 
     function initialize() {
+        nusServiceUuid = BluetoothLowEnergy.stringToUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+        nusRxUuid      = BluetoothLowEnergy.stringToUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
+        nusTxUuid      = BluetoothLowEnergy.stringToUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
     }
 
     public function registerProfile() as Void {
         try {
-            BluetoothLowEnergy.registerProfile(_nusProfileDef);
+            var profileDef = {
+                :uuid => nusServiceUuid,
+                :characteristics => [
+                    {
+                        :uuid => nusRxUuid
+                    },
+                    {
+                        :uuid => nusTxUuid,
+                        :descriptors => [BluetoothLowEnergy.cccdUuid()]
+                    }
+                ]
+            };
+            BluetoothLowEnergy.registerProfile(profileDef);
         } catch (e) {
-            System.println("BLE RegisterProfile error: " + e.getErrorMessage());
+            System.println("BLE RegisterProfile notice: Profile already registered or limit reached");
         }
     }
 
@@ -73,7 +75,7 @@ class MeshBleManager {
             var res = result as BluetoothLowEnergy.ScanResult;
             var iter = res.getServiceUuids();
             for (var u = iter.next(); u != null; u = iter.next()) {
-                if (u.equals(NUS_SERVICE_UUID)) {
+                if (nusServiceUuid != null && u.equals(nusServiceUuid)) {
                     stopScan();
                     var name = res.getDeviceName();
                     if (name != null) {
@@ -101,10 +103,13 @@ class MeshBleManager {
     }
 
     private function setupCharacteristics(device as BluetoothLowEnergy.Device) as Void {
-        var service = device.getService(NUS_SERVICE_UUID);
+        if (nusServiceUuid == null || nusRxUuid == null || nusTxUuid == null) {
+            return;
+        }
+        var service = device.getService(nusServiceUuid);
         if (service != null) {
-            _rxCharacteristic = service.getCharacteristic(NUS_RX_UUID);
-            _txCharacteristic = service.getCharacteristic(NUS_TX_UUID);
+            _rxCharacteristic = service.getCharacteristic(nusRxUuid);
+            _txCharacteristic = service.getCharacteristic(nusTxUuid);
             if (_txCharacteristic != null) {
                 var cccd = _txCharacteristic.getDescriptor(BluetoothLowEnergy.cccdUuid());
                 if (cccd != null) {
@@ -144,7 +149,8 @@ class MeshBleManager {
                 _rxCharacteristic.requestWrite(bytes, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
                 return true;
             } catch (e) {
-                System.println("BLE write error: " + e.getErrorMessage());
+                System.println("BLE write error");
+                e.printStackTrace();
             }
         }
         return false;
