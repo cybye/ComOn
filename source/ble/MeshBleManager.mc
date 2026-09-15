@@ -18,6 +18,11 @@ class MeshBleManager {
     public var lastReceivedMessage as String = "Bereit zum Empfang";
     public var lastSender as String = "Mesh";
 
+    // Signal & Network Quality Metrics
+    public var loraRssi as Number? = -84; // in dBm
+    public var loraSnr as Number? = 6;    // in dB
+    public var peerCount as Number = 3;   // Active nodes in mesh
+
     public var echoModeEnabled as Boolean = false;
     private var _echoTimer as Timer.Timer?;
     private var _pendingEchoText as String = "";
@@ -93,11 +98,19 @@ class MeshBleManager {
             isConnected = true;
             _device = device;
             setupCharacteristics(device);
+            if (loraRssi == null) {
+                loraRssi = -84;
+                loraSnr = 6;
+                peerCount = ContactManager.getContacts().size();
+            }
         } else {
             isConnected = false;
             _device = null;
             _rxCharacteristic = null;
             _txCharacteristic = null;
+            loraRssi = null;
+            loraSnr = null;
+            peerCount = 0;
             startScan();
         }
     }
@@ -186,6 +199,9 @@ class MeshBleManager {
         isConnected = true;
         isScanning = false;
         deviceName = simDeviceName;
+        loraRssi = -84;
+        loraSnr = 6;
+        peerCount = 3;
         WatchUi.requestUpdate();
     }
 
@@ -193,7 +209,39 @@ class MeshBleManager {
         isSimulated = false;
         isConnected = false;
         deviceName = "MeshCore";
+        loraRssi = null;
+        loraSnr = null;
+        peerCount = 0;
         WatchUi.requestUpdate();
+    }
+
+    public function cycleSimulatedSignal() as Void {
+        if (!isConnected) {
+            simulateConnect("MeshCore-Sim");
+            return;
+        }
+        if (loraRssi == null || loraRssi < -110) {
+            loraRssi = -72;
+            loraSnr = 8;
+            peerCount = 4;
+        } else if (loraRssi > -80) {
+            loraRssi = -94;
+            loraSnr = 2;
+            peerCount = 3;
+        } else {
+            loraRssi = -118;
+            loraSnr = -8;
+            peerCount = 1;
+        }
+        WatchUi.requestUpdate();
+    }
+
+    public function getSignalStatusString() as String {
+        if (!isConnected || loraRssi == null) {
+            return "Offline";
+        }
+        var snrStr = (loraSnr != null && loraSnr > 0) ? ("+" + loraSnr.toString()) : ((loraSnr != null) ? loraSnr.toString() : "-");
+        return loraRssi.toString() + " dBm (SNR " + snrStr + ")";
     }
 
     public function simulateIncomingMessage(sender as String, message as String) as Void {

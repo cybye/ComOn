@@ -137,10 +137,67 @@ class DashboardView extends WatchUi.View {
             dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
         }
 
-        // 3. Subtle bottom summary line (positioned higher to leave room for bottom nav)
+        // 3. Multi-segment status footer (Battery | LoRa RSSI | Mesh Nodes)
         var bat = tlm.getBatteryPercent().toNumber();
-        dc.setColor(0x666666, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h - 85, fontXtiny, "Batt: " + bat + "%", Graphics.TEXT_JUSTIFY_CENTER);
+        var batText = "Batt: " + bat + "%";
+        var divText = " | ";
+
+        var loraText = "Offline";
+        var loraColor = 0x666666;
+        var nodeText = "0 Nodes";
+        var nodeColor = 0x666666;
+
+        if (bleMgr.isConnected) {
+            if (bleMgr.loraRssi != null) {
+                var rssi = bleMgr.loraRssi as Number;
+                loraText = rssi.toString() + " dBm";
+                if (rssi >= -90) {
+                    loraColor = 0x00e676; // Bright Green (Exzellent / Stark)
+                } else if (rssi >= -105) {
+                    loraColor = 0xffea00; // Bright Yellow (Mittel)
+                } else {
+                    loraColor = 0xff5555; // Red/Orange (Schwach)
+                }
+            } else {
+                loraText = "OK";
+                loraColor = 0x00e676;
+            }
+            nodeText = bleMgr.peerCount.toString() + " Nodes";
+            nodeColor = 0x00d4ff; // Cyan
+        }
+
+        var wBat = dc.getTextWidthInPixels(batText, fontXtiny);
+        var wDiv = dc.getTextWidthInPixels(divText, fontXtiny);
+        var wLora = dc.getTextWidthInPixels(loraText, fontXtiny);
+        var wNode = dc.getTextWidthInPixels(nodeText, fontXtiny);
+
+        var totalStatusW = wBat + wDiv + wLora + wDiv + wNode;
+        var curX = cx - (totalStatusW / 2);
+        var statusY = h - 85;
+
+        // Draw Bat
+        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(curX, statusY, fontXtiny, batText, Graphics.TEXT_JUSTIFY_LEFT);
+        curX += wBat;
+
+        // Draw Div 1
+        dc.setColor(0x444444, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(curX, statusY, fontXtiny, divText, Graphics.TEXT_JUSTIFY_LEFT);
+        curX += wDiv;
+
+        // Draw LoRa RSSI
+        dc.setColor(loraColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(curX, statusY, fontXtiny, loraText, Graphics.TEXT_JUSTIFY_LEFT);
+        curX += wLora;
+
+        // Draw Div 2
+        dc.setColor(0x444444, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(curX, statusY, fontXtiny, divText, Graphics.TEXT_JUSTIFY_LEFT);
+        curX += wDiv;
+
+        // Draw Node Count
+        dc.setColor(nodeColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(curX, statusY, fontXtiny, nodeText, Graphics.TEXT_JUSTIFY_LEFT);
     }
 
     // -----------------------------------------------------------------

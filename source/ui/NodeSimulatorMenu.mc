@@ -14,6 +14,7 @@ class NodeSimulatorMenu extends WatchUi.Menu2 {
         addItem(new WatchUi.MenuItem("SOS Notruf einspeisen", "Notfall Broadcast", "SIM_SOS", null));
         addItem(new WatchUi.MenuItem("Neue Kontakte lernen", "OTA Discovery (+3)", "SIM_DISCOVER", null));
         addItem(new WatchUi.MenuItem("Echo / Loopback", echoSub, "SIM_ECHO", null));
+        addItem(new WatchUi.MenuItem("Signal durchschalten", bleMgr.getSignalStatusString(), "SIM_SIGNAL", null));
         addItem(new WatchUi.MenuItem("Verbindung umschalten", connSub, "SIM_CONN", null));
     }
 }
@@ -49,6 +50,10 @@ class NodeSimulatorDelegate extends WatchUi.Menu2InputDelegate {
             bleMgr.echoModeEnabled = !bleMgr.echoModeEnabled;
             item.setSubLabel(bleMgr.echoModeEnabled ? "Status: AN" : "Status: AUS");
             WatchUi.showToast(bleMgr.echoModeEnabled ? "Echo: AN (Antwort nach 1.2s)" : "Echo: AUS", null);
+        } else if (id.equals("SIM_SIGNAL")) {
+            bleMgr.cycleSimulatedSignal();
+            item.setSubLabel(bleMgr.getSignalStatusString());
+            WatchUi.showToast("Signal: " + bleMgr.getSignalStatusString(), null);
         } else if (id.equals("SIM_CONN")) {
             if (bleMgr.isConnected) {
                 bleMgr.simulateDisconnect();
