@@ -123,7 +123,7 @@ class DashboardView extends WatchUi.View {
     }
 
     // -----------------------------------------------------------------
-    // SCREEN 2: TELEMETRIE & SENSOREN (2-Line per Box Clean Layout)
+    // SCREEN 2: TELEMETRIE & SENSOREN (Abkürzungen HRF, GPS, BATT)
     // -----------------------------------------------------------------
     private function drawTelemetryPage(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
@@ -148,37 +148,37 @@ class DashboardView extends WatchUi.View {
         var row1Y = 65;
         var row2Y = 152;
 
-        // Box 1: Puls
-        drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, "HERZFREQUENZ", 0x1f1111);
+        // Box 1: HRF (Herzfrequenz)
+        drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, "HRF", 0x1f1111);
         var hr = tlm.getHeartRate();
         var hrStr = (hr != null) ? hr.toString() + " bpm" : "-- bpm";
         dc.setColor(0xff3b30, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box1X + (boxW/2), row1Y + 32, fontTiny, hrStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box1X + (boxW/2), row1Y + 34, fontTiny, hrStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Box 2: GPS
         var gpsBg = tlm.hasGpsFix ? 0x112211 : 0x1a1a1a;
-        drawTelemetryBox(dc, box2X, row1Y, boxW, boxH, "GPS SIGNAL", gpsBg);
+        drawTelemetryBox(dc, box2X, row1Y, boxW, boxH, "GPS", gpsBg);
         var gpsText = tlm.hasGpsFix ? "FIX OK" : "SUCHE...";
         var gpsColor = tlm.hasGpsFix ? Graphics.COLOR_GREEN : Graphics.COLOR_ORANGE;
         dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row1Y + 32, fontTiny, gpsText, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box2X + (boxW/2), row1Y + 34, fontTiny, gpsText, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Box 3: Schritte
+        // Box 3: SCHRITTE
         drawTelemetryBox(dc, box1X, row2Y, boxW, boxH, "SCHRITTE", 0x14161c);
         var steps = tlm.getSteps();
         var stepsStr = (steps != null) ? steps.toString() : "0";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box1X + (boxW/2), row2Y + 32, fontTiny, stepsStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box1X + (boxW/2), row2Y + 34, fontTiny, stepsStr, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Box 4: Batterie
-        drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "BATTERIE", 0x14161c);
+        // Box 4: BATT (Batterie)
+        drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "BATT", 0x14161c);
         var batStr = tlm.getBatteryPercent().format("%.0f") + "%";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row2Y + 32, fontTiny, batStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box2X + (boxW/2), row2Y + 34, fontTiny, batStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // 4. Action Button: Position senden
         var btnY = 265;
-        var pillW = 220;
+        var pillW = 230;
         var pillH = 38;
         var pillX = cx - (pillW / 2);
 
