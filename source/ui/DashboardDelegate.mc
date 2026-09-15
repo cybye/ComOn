@@ -126,9 +126,8 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
 
         if (id.equals("MENU_REPLY")) {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            if (WatchUi has :TextPicker) {
-                WatchUi.pushView(new WatchUi.TextPicker(""), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);
-            }
+            var keyView = new QwertyKeyboardView("");
+            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
         } else if (id.equals("MENU_POS")) {
             var ok = bleMgr.sendCurrentPosition(chIdx);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);

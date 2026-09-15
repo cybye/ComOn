@@ -29,10 +29,12 @@ class MessageActionDelegate extends WatchUi.Menu2InputDelegate {
         var chIdx = ContactManager.selectedChannelIdx;
 
         if (id.equals("ACT_REPLY_KEY")) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            if (WatchUi has :TextPicker) {
-                WatchUi.pushView(new WatchUi.TextPicker(""), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);
+            if (!_sender.equals("Mesh") && !_sender.equals("Node (Echo)")) {
+                ContactManager.selectContact(_sender, _sender);
             }
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            var keyView = new QwertyKeyboardView("");
+            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
         } else if (id.equals("ACT_REPLY_CANNED")) {
             WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("ACT_REPLY_POS")) {

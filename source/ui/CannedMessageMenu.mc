@@ -50,11 +50,9 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
         var chIdx = ContactManager.selectedChannelIdx;
 
         if (id.equals("MSG_CUSTOM")) {
-            if (WatchUi has :TextPicker) {
-                WatchUi.pushView(new WatchUi.TextPicker(""), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);
-            } else {
-                WatchUi.showToast("Tastatur nicht verf\u00fcgbar", null);
-            }
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            var keyView = new QwertyKeyboardView("");
+            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
             return;
         }
 

@@ -57,9 +57,8 @@ class MeshNotificationManager {
             var chIdx = ContactManager.selectedChannelIdx;
 
             if (actionId.equals("ACTION_REPLY")) {
-                if (WatchUi has :TextPicker) {
-                    WatchUi.pushView(new WatchUi.TextPicker(""), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);
-                }
+                var keyView = new QwertyKeyboardView("");
+                WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
             } else if (actionId.equals("ACTION_SEND_POS")) {
                 bleMgr.sendCurrentPosition(chIdx);
             } else if (actionId.equals("ACTION_SEND_OK")) {
