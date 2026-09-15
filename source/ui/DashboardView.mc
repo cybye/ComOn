@@ -38,23 +38,25 @@ class DashboardView extends WatchUi.View {
             drawTelemetryPage(dc);
         }
 
-        drawPageIndicators(dc);
+        drawRadialNavigation(dc);
     }
 
     // -----------------------------------------------------------------
-    // SCREEN 1: CHAT & DASHBOARD
+    // SCREEN 1: CHAT & DASHBOARD (Truly Centered)
     // -----------------------------------------------------------------
     private function drawMessagePage(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
         var cx = w / 2;
+        var cy = h / 2;
 
         var bleMgr = getBleManager();
+        var tlm = TelemetryProvider.getInstance();
 
         var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
         var fontTiny  = Graphics.FONT_SYSTEM_TINY;
 
-        // 1. Status Bar
+        // 1. Top Header: Status
         var statusColor = Graphics.COLOR_RED;
         var statusText = "Getrennt";
         if (bleMgr.isConnected) {
@@ -65,7 +67,7 @@ class DashboardView extends WatchUi.View {
             statusText = "Suche Node...";
         }
 
-        var topY = 26;
+        var topY = 34;
         var textWidth = dc.getTextWidthInPixels(statusText, fontXtiny);
         var dotX = cx - (textWidth / 2) - 12;
 
@@ -76,59 +78,47 @@ class DashboardView extends WatchUi.View {
         dc.drawText(cx + 4, topY, fontXtiny, statusText, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Target Channel / Contact Badge
-        var targetY = 56;
+        var targetY = 62;
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT); // Cyan
         dc.drawText(cx, targetY, fontXtiny, "[" + ContactManager.getTargetDisplayName() + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
-        // 2. Large Message Card
-        var cardW = (w * 0.84).toNumber();
-        var cardH = 135;
+        // 2. TRUE CENTER: Message Card (Centered at cy = 227)
+        var cardW = (w * 0.76).toNumber();
+        var cardH = 145;
         var cardX = cx - (cardW / 2);
-        var cardY = 94;
+        var cardY = cy - (cardH / 2); // Exactly centered vertically!
 
         dc.setColor(0x12151f, Graphics.COLOR_TRANSPARENT);
-        dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, 12);
+        dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, 14);
         dc.setColor(0x28324a, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, 12);
+        dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, 14);
 
         // Header inside card
         dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Orange
-        dc.drawText(cx, cardY + 12, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, cardY + 14, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
 
         // Main message text
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 44, fontTiny, bleMgr.lastReceivedMessage, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, cardY + 50, fontTiny, bleMgr.lastReceivedMessage, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Sender
         dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 95, fontXtiny, "Absender: " + bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, cardY + 105, fontXtiny, "Absender: " + bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // 3. Action Button (START: Menü)
-        var btnY = 265;
-        var pillW = 210;
-        var pillH = 38;
-        var pillX = cx - (pillW / 2);
-
-        dc.setColor(0x16325c, Graphics.COLOR_TRANSPARENT);
-        dc.fillRoundedRectangle(pillX, btnY, pillW, pillH, 10);
-        dc.setColor(0x3882e0, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(pillX, btnY, pillW, pillH, 10);
-
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, btnY + 8, fontXtiny, "START: Menü", Graphics.TEXT_JUSTIFY_CENTER);
-
-        // Page scroll hint
-        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 325, fontXtiny, "DOWN: Telemetrie  v", Graphics.TEXT_JUSTIFY_CENTER);
+        // 3. Subtle bottom summary line
+        var bat = tlm.getBatteryPercent().toNumber();
+        dc.setColor(0x555555, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, h - 52, fontXtiny, "Akku: " + bat + "%", Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // -----------------------------------------------------------------
-    // SCREEN 2: TELEMETRIE & SENSOREN (Abkürzungen HRF, GPS, BATT)
+    // SCREEN 2: TELEMETRIE & SENSOREN (Truly Centered Grid)
     // -----------------------------------------------------------------
     private function drawTelemetryPage(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
         var cx = w / 2;
+        var cy = h / 2;
 
         var tlm = TelemetryProvider.getInstance();
 
@@ -137,18 +127,20 @@ class DashboardView extends WatchUi.View {
 
         // Title
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 32, fontXtiny, "TELEMETRIE", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, 40, fontXtiny, "TELEMETRIE", Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Grid 2x2 Boxes
-        var boxW = 144;
+        // Grid 2x2 Boxes (Centered vertically at cy = 227)
+        var boxW = 140;
         var boxH = 75;
         var gap = 12;
         var box1X = cx - boxW - (gap / 2);
         var box2X = cx + (gap / 2);
-        var row1Y = 65;
-        var row2Y = 152;
+        
+        var totalGridH = (boxH * 2) + gap;
+        var row1Y = cy - (totalGridH / 2) + 6; // ~153px
+        var row2Y = row1Y + boxH + gap;       // ~240px
 
-        // Box 1: HRF (Herzfrequenz)
+        // Box 1: HRF
         drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, "HRF", 0x1f1111);
         var hr = tlm.getHeartRate();
         var hrStr = (hr != null) ? hr.toString() + " bpm" : "-- bpm";
@@ -170,29 +162,60 @@ class DashboardView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(box1X + (boxW/2), row2Y + 34, fontTiny, stepsStr, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Box 4: BATT (Batterie)
+        // Box 4: BATT
         drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "BATT", 0x14161c);
         var batStr = tlm.getBatteryPercent().format("%.0f") + "%";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(box2X + (boxW/2), row2Y + 34, fontTiny, batStr, Graphics.TEXT_JUSTIFY_CENTER);
+    }
 
-        // 4. Action Button: Position senden
-        var btnY = 265;
-        var pillW = 230;
-        var pillH = 38;
-        var pillX = cx - (pillW / 2);
+    // -----------------------------------------------------------------
+    // RADIAL NAVIGATION LABELS (Along curved bezel at 2 and 4 o'clock)
+    // -----------------------------------------------------------------
+    private function drawRadialNavigation(dc as Graphics.Dc) as Void {
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var cx = w / 2;
+        var cy = h / 2;
+        var r = (w / 2) - 4; // Right on the outer perimeter
 
-        dc.setColor(0x0f4228, Graphics.COLOR_TRANSPARENT);
-        dc.fillRoundedRectangle(pillX, btnY, pillW, pillH, 10);
-        dc.setColor(0x27ae60, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(pillX, btnY, pillW, pillH, 10);
+        var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
 
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, btnY + 8, fontXtiny, "START: Position", Graphics.TEXT_JUSTIFY_CENTER);
+        // -------------------------------------------------------------
+        // BUTTON AT 2 O'CLOCK (START / SELECT)
+        // -------------------------------------------------------------
+        var btn2Label = (pageIndex == 0) ? "MENÜ" : "POS";
+        var btn2Color = (pageIndex == 0) ? 0x3882e0 : 0x27ae60; // Blue for Menu, Green for Pos
 
-        // Page scroll hint
-        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 325, fontXtiny, "^  UP: Chat", Graphics.TEXT_JUSTIFY_CENTER);
+        // Draw curved accent arc on the perimeter (approx 20 deg arc at 2 o'clock / -30 deg)
+        dc.setColor(btn2Color, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(3);
+        dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 350, 310);
+        dc.setPenWidth(1);
+
+        // Draw small label hugging the circular boundary
+        // Position at ~2 o'clock: x ~ 430, y ~ 125
+        dc.setColor(btn2Color, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w - 24, 116, fontXtiny, btn2Label, Graphics.TEXT_JUSTIFY_RIGHT);
+        dc.fillCircle(w - 14, 126, 3); // Subtle tick indicator
+
+        // -------------------------------------------------------------
+        // BUTTON AT 4 O'CLOCK (DATA / CHAT / DOWN)
+        // -------------------------------------------------------------
+        var btn4Label = (pageIndex == 0) ? "DATA" : "CHAT";
+        var btn4Color = (pageIndex == 0) ? 0x00d4ff : 0xff9500; // Cyan for Data, Orange for Chat
+
+        // Draw curved accent arc on the perimeter (approx 20 deg arc at 4 o'clock / +30 deg)
+        dc.setColor(btn4Color, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(3);
+        dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 50, 10);
+        dc.setPenWidth(1);
+
+        // Draw small label hugging the circular boundary
+        // Position at ~4 o'clock: x ~ 430, y ~ 305
+        dc.setColor(btn4Color, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w - 24, 305, fontXtiny, btn4Label, Graphics.TEXT_JUSTIFY_RIGHT);
+        dc.fillCircle(w - 14, 315, 3); // Subtle tick indicator
     }
 
     private function drawTelemetryBox(dc as Graphics.Dc, x as Number, y as Number, w as Number, h as Number, title as String, bgColor as Number) as Void {
@@ -203,20 +226,5 @@ class DashboardView extends WatchUi.View {
 
         dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x + (w/2), y + 8, Graphics.FONT_SYSTEM_XTINY, title, Graphics.TEXT_JUSTIFY_CENTER);
-    }
-
-    // Page indicator dots on the right edge
-    private function drawPageIndicators(dc as Graphics.Dc) as Void {
-        var w = dc.getWidth();
-        var cy = dc.getHeight() / 2;
-        var dotX = w - 18;
-
-        // Dot 1
-        dc.setColor((pageIndex == 0) ? 0x00d4ff : 0x444444, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(dotX, cy - 8, 4);
-
-        // Dot 2
-        dc.setColor((pageIndex == 1) ? 0x00d4ff : 0x444444, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(dotX, cy + 8, 4);
     }
 }

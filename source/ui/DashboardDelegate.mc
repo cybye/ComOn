@@ -4,13 +4,14 @@ import Toybox.System;
 
 class DashboardDelegate extends WatchUi.BehaviorDelegate {
     private var _view as DashboardView;
+    private var _lastBackTime as Number = 0;
 
     function initialize(view as DashboardView) {
         BehaviorDelegate.initialize();
         _view = view;
     }
 
-    //! START button or Tap
+    //! 2 O'CLOCK BUTTON (START / SELECT)
     function onSelect() as Boolean {
         if (_view.pageIndex == 1) {
             // On Telemetry page: START sends position directly!
@@ -22,7 +23,27 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    //! DOWN button (Bottom Left) / Swipe Up: Switch to Telemetry Screen
+    //! 4 O'CLOCK BUTTON (BACK / LAP) -> Toggle between Chat & Data
+    function onBack() as Boolean {
+        if (_view.pageIndex == 1) {
+            // On Telemetry page: Return to Chat
+            _view.pageIndex = 0;
+            WatchUi.requestUpdate();
+            return true;
+        } else {
+            // On Chat page: Double-click exits, single-click switches to DATA
+            var now = System.getTimer();
+            if (now - _lastBackTime < 1200) {
+                return false; // Standard exit
+            }
+            _lastBackTime = now;
+            _view.pageIndex = 1; // Switch to DATA
+            WatchUi.requestUpdate();
+            return true;
+        }
+    }
+
+    //! 7 O'CLOCK BUTTON (DOWN) / Swipe Up
     function onNextPage() as Boolean {
         if (_view.pageIndex == 0) {
             _view.pageIndex = 1;
@@ -32,32 +53,19 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    //! UP button (Middle Left) / Swipe Down: Switch to Chat Screen
+    //! 9 O'CLOCK BUTTON (UP) / Swipe Down
     function onPreviousPage() as Boolean {
         if (_view.pageIndex == 1) {
             _view.pageIndex = 0;
             WatchUi.requestUpdate();
             return true;
         } else {
-            // Shortcut on Chat Screen: Send Position immediately
             sendPositionDirect();
             return true;
         }
     }
 
-    //! BACK button (Bottom Right)
-    function onBack() as Boolean {
-        if (_view.pageIndex == 1) {
-            // Return from Telemetry to Chat screen
-            _view.pageIndex = 0;
-            WatchUi.requestUpdate();
-            return true;
-        }
-        // If on Chat screen, standard Garmin exit
-        return false;
-    }
-
-    //! Explicit key handler for maximum simulator & hardware compatibility
+    //! Explicit key handler
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
         if (key == WatchUi.KEY_DOWN) {
@@ -86,6 +94,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         menu.addItem(new WatchUi.MenuItem("Ziel wählen", ContactManager.getTargetDisplayName(), "MENU_TARGET", null));
         menu.addItem(new WatchUi.MenuItem("SOS Notruf", "Notfall Broadcast", "MENU_SOS", null));
         menu.addItem(new WatchUi.MenuItem("Node koppeln", "Bluetooth Suche", "MENU_PAIR", null));
+        menu.addItem(new WatchUi.MenuItem("App beenden", null, "MENU_EXIT", null));
 
         WatchUi.pushView(menu, new MainMenuDelegate(), WatchUi.SLIDE_LEFT);
     }
@@ -115,6 +124,8 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
             bleMgr.startScan();
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             WatchUi.showToast("Suche Node...", null);
+        } else if (id.equals("MENU_EXIT")) {
+            System.exit();
         }
     }
 
