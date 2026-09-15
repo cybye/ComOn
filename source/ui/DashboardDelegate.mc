@@ -68,6 +68,22 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
+    //! Touchscreen Tap handler: Tap on message card opens reply actions
+    function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
+        if (_view.pageIndex == 0) {
+            var coords = clickEvent.getCoordinates();
+            var tx = coords[0];
+            var ty = coords[1];
+            // Message card bounds: x: 35..420, y: 115..330
+            if (tx >= 35 && tx <= 420 && ty >= 115 && ty <= 330) {
+                var sender = getBleManager().lastSender;
+                WatchUi.pushView(new MessageActionMenu(sender), new MessageActionDelegate(sender), WatchUi.SLIDE_LEFT);
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function sendPositionDirect() as Void {
         var bleMgr = getBleManager();
         var chIdx = ContactManager.selectedChannelIdx;
@@ -79,6 +95,13 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
 
     private function openMainMenu() as Void {
         var menu = new WatchUi.Menu2({ :title => "MeshCore" });
+        var bleMgr = getBleManager();
+        var lastSender = bleMgr.lastSender;
+
+        // Quick Reply item at top of menu (START -> START for instant reply)
+        var replyLabel = (!lastSender.equals("Mesh")) ? ("Antwort an " + lastSender) : "Antworten";
+        menu.addItem(new WatchUi.MenuItem(replyLabel, "Tastatur", "MENU_REPLY", null));
+
         menu.addItem(new WatchUi.MenuItem("Position senden", null, "MENU_POS", null));
         menu.addItem(new WatchUi.MenuItem("Nachricht senden", null, "MENU_MSG", null));
         menu.addItem(new WatchUi.MenuItem("Ziel wählen", ContactManager.getTargetDisplayName(), "MENU_TARGET", null));
@@ -101,7 +124,12 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
         var bleMgr = getBleManager();
         var chIdx = ContactManager.selectedChannelIdx;
 
-        if (id.equals("MENU_POS")) {
+        if (id.equals("MENU_REPLY")) {
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            if (WatchUi has :TextPicker) {
+                WatchUi.pushView(new WatchUi.TextPicker(""), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);
+            }
+        } else if (id.equals("MENU_POS")) {
             var ok = bleMgr.sendCurrentPosition(chIdx);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             WatchUi.showToast(ok ? "Position gesendet" : "Nicht verbunden", null);
