@@ -54,7 +54,7 @@ class DashboardView extends WatchUi.View {
         var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
         var fontTiny  = Graphics.FONT_SYSTEM_TINY;
 
-        // 1. Status Bar (XTINY for compact elegance)
+        // 1. Status Bar
         var statusColor = Graphics.COLOR_RED;
         var statusText = "Getrennt";
         if (bleMgr.isConnected) {
@@ -65,7 +65,7 @@ class DashboardView extends WatchUi.View {
             statusText = "Suche Node...";
         }
 
-        var topY = 30;
+        var topY = 26;
         var textWidth = dc.getTextWidthInPixels(statusText, fontXtiny);
         var dotX = cx - (textWidth / 2) - 12;
 
@@ -81,10 +81,10 @@ class DashboardView extends WatchUi.View {
         dc.drawText(cx, targetY, fontXtiny, "[" + ContactManager.getTargetDisplayName() + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
         // 2. Large Message Card
-        var cardW = (w * 0.82).toNumber();
+        var cardW = (w * 0.84).toNumber();
         var cardH = 135;
         var cardX = cx - (cardW / 2);
-        var cardY = 96;
+        var cardY = 94;
 
         dc.setColor(0x12151f, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, 12);
@@ -105,7 +105,7 @@ class DashboardView extends WatchUi.View {
 
         // 3. Action Button (START: Menü)
         var btnY = 265;
-        var pillW = 190;
+        var pillW = 210;
         var pillH = 38;
         var pillX = cx - (pillW / 2);
 
@@ -123,7 +123,7 @@ class DashboardView extends WatchUi.View {
     }
 
     // -----------------------------------------------------------------
-    // SCREEN 2: TELEMETRIE & SENSOREN
+    // SCREEN 2: TELEMETRIE & SENSOREN (2-Line per Box Clean Layout)
     // -----------------------------------------------------------------
     private function drawTelemetryPage(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
@@ -134,61 +134,51 @@ class DashboardView extends WatchUi.View {
 
         var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
         var fontTiny  = Graphics.FONT_SYSTEM_TINY;
-        var fontSmall = Graphics.FONT_SYSTEM_SMALL;
 
-        // Title (short to avoid circle clipping)
+        // Title
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 36, fontXtiny, "TELEMETRIE", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, 32, fontXtiny, "TELEMETRIE", Graphics.TEXT_JUSTIFY_CENTER);
 
         // Grid 2x2 Boxes
-        var boxW = 140;
+        var boxW = 144;
         var boxH = 75;
         var gap = 12;
         var box1X = cx - boxW - (gap / 2);
         var box2X = cx + (gap / 2);
-        var row1Y = 70;
-        var row2Y = 158;
+        var row1Y = 65;
+        var row2Y = 152;
 
-        // Box 1: Puls / HR
-        drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, "PULS", 0x1f1111);
+        // Box 1: Puls
+        drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, "HERZFREQUENZ", 0x1f1111);
         var hr = tlm.getHeartRate();
-        var hrStr = (hr != null) ? hr.toString() : "--";
+        var hrStr = (hr != null) ? hr.toString() + " bpm" : "-- bpm";
         dc.setColor(0xff3b30, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box1X + (boxW/2), row1Y + 22, fontSmall, hrStr, Graphics.TEXT_JUSTIFY_CENTER);
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box1X + (boxW/2), row1Y + 48, fontXtiny, "bpm", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box1X + (boxW/2), row1Y + 32, fontTiny, hrStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Box 2: GPS
         var gpsBg = tlm.hasGpsFix ? 0x112211 : 0x1a1a1a;
-        drawTelemetryBox(dc, box2X, row1Y, boxW, boxH, "GPS", gpsBg);
-        var gpsStatus = tlm.hasGpsFix ? "FIX OK" : "SUCHE";
+        drawTelemetryBox(dc, box2X, row1Y, boxW, boxH, "GPS SIGNAL", gpsBg);
+        var gpsText = tlm.hasGpsFix ? "FIX OK" : "SUCHE...";
         var gpsColor = tlm.hasGpsFix ? Graphics.COLOR_GREEN : Graphics.COLOR_ORANGE;
         dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row1Y + 22, fontSmall, gpsStatus, Graphics.TEXT_JUSTIFY_CENTER);
-        var altStr = (tlm.currentAlt != null) ? tlm.currentAlt.format("%.0f") + " m" : "-- m";
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row1Y + 48, fontXtiny, altStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box2X + (boxW/2), row1Y + 32, fontTiny, gpsText, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Box 3: Schritte
         drawTelemetryBox(dc, box1X, row2Y, boxW, boxH, "SCHRITTE", 0x14161c);
         var steps = tlm.getSteps();
         var stepsStr = (steps != null) ? steps.toString() : "0";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box1X + (boxW/2), row2Y + 22, fontSmall, stepsStr, Graphics.TEXT_JUSTIFY_CENTER);
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box1X + (boxW/2), row2Y + 48, fontXtiny, "heute", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box1X + (boxW/2), row2Y + 32, fontTiny, stepsStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Box 4: Batterie
-        drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "AKKU", 0x14161c);
+        drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "BATTERIE", 0x14161c);
         var batStr = tlm.getBatteryPercent().format("%.0f") + "%";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row2Y + 22, fontSmall, batStr, Graphics.TEXT_JUSTIFY_CENTER);
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row2Y + 48, fontXtiny, "Uhr", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box2X + (boxW/2), row2Y + 32, fontTiny, batStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // 4. Action Button: Position senden
         var btnY = 265;
-        var pillW = 200;
+        var pillW = 220;
         var pillH = 38;
         var pillX = cx - (pillW / 2);
 
@@ -212,7 +202,7 @@ class DashboardView extends WatchUi.View {
         dc.drawRoundedRectangle(x, y, w, h, 8);
 
         dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x + (w/2), y + 5, Graphics.FONT_SYSTEM_XTINY, title, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(x + (w/2), y + 8, Graphics.FONT_SYSTEM_XTINY, title, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // Page indicator dots on the right edge
