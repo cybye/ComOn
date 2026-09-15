@@ -9,7 +9,8 @@ class NodeSimulatorMenu extends WatchUi.Menu2 {
         var connSub = bleMgr.isConnected ? "Aktiv (" + bleMgr.deviceName + ")" : "Getrennt";
         var echoSub = bleMgr.echoModeEnabled ? "Status: AN" : "Status: AUS";
 
-        addItem(new WatchUi.MenuItem("Nachricht simulieren", "Team: Wo seid ihr?", "SIM_MSG", null));
+        addItem(new WatchUi.MenuItem("Kurze Nachricht", "Team Alpha: Wo seid ihr?", "SIM_MSG", null));
+        addItem(new WatchUi.MenuItem("Lange Nachricht (Max)", "Grat 2450m, steigen ab...", "SIM_LONG_MSG", null));
         addItem(new WatchUi.MenuItem("SOS Notruf einspeisen", "Notfall Broadcast", "SIM_SOS", null));
         addItem(new WatchUi.MenuItem("Neue Kontakte lernen", "OTA Discovery (+3)", "SIM_DISCOVER", null));
         addItem(new WatchUi.MenuItem("Echo / Loopback", echoSub, "SIM_ECHO", null));
@@ -30,6 +31,10 @@ class NodeSimulatorDelegate extends WatchUi.Menu2InputDelegate {
             bleMgr.simulateIncomingMessage("Florian", "Team Alpha: Wo seid ihr?");
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             WatchUi.showToast("Nachricht empfangen!", null);
+        } else if (id.equals("SIM_LONG_MSG")) {
+            bleMgr.simulateIncomingMessage("Florian", "Team Alpha: Wir sind am Grat auf 2.450m. Sicht wird schlechter, steigen jetzt zur Biwakschachtel ab. Bitte um Bestaetigung!");
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            WatchUi.showToast("Lange Nachricht empfangen!", null);
         } else if (id.equals("SIM_SOS")) {
             bleMgr.simulateIncomingMessage("SOS Florian", "Notfall 47.4925N 11.0955E");
             WatchUi.popView(WatchUi.SLIDE_RIGHT);

@@ -119,14 +119,17 @@ class DashboardView extends WatchUi.View {
 
         // Multi-line message text: Centered vertically between separator and footer
         var maxTextWidth = cardW - 36;
-        var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, 4);
-        var lineSpacing = 6;
+        var lineSpacing = 5;
         var lineHeight = fontH + lineSpacing;
-        var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
         
         var msgTop = sepY + 6;
         var msgBottom = footerY - 6;
         var availableH = msgBottom - msgTop;
+        var maxLines = (availableH / lineHeight).toNumber();
+        if (maxLines < 1) { maxLines = 1; }
+
+        var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, maxLines);
+        var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
         var startY = msgTop + ((availableH - totalTextH) / 2);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
