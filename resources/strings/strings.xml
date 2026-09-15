@@ -1,0 +1,25 @@
+<strings>
+    <string id="AppName">MeshCore</string>
+    <string id="StatusDisconnected">Getrennt</string>
+    <string id="StatusScanning">Suche...</string>
+    <string id="StatusConnected">Verbunden</string>
+    
+    <string id="MenuSendPosition">Position senden</string>
+    <string id="MenuQuickMessage">Nachricht senden</string>
+    <string id="MenuContacts">Kontakte</string>
+    <string id="MenuChannels">Kanäle</string>
+    <string id="MenuSos">SOS Notruf</string>
+    <string id="MenuPair">Node koppeln</string>
+    
+    <string id="CannedOk">Alles OK</string>
+    <string id="CannedAtTarget">Am Treffpunkt/Ziel</string>
+    <string id="CannedDelay15">Verzögerung 15 min</string>
+    <string id="CannedDelay30">Verzögerung 30 min</string>
+    <string id="CannedNeedHelp">Brauche Hilfe</string>
+    <string id="CannedRadioCheck">Funktest</string>
+    
+    <string id="NotifTitle">MeshCore</string>
+    <string id="NotifActionPosition">Position senden</string>
+    <string id="NotifActionOk">Alles OK</string>
+    <string id="NotifActionDismiss">Schließen</string>
+</strings>
