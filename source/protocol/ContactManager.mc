@@ -43,4 +43,22 @@ class ContactManager {
     public static function getTargetDisplayName() as String {
         return selectedTargetName;
     }
+
+    public static function addChannel(idx as Number, name as String) as Void {
+        for (var i = 0; i < _channels.size(); i++) {
+            if (_channels[i][:idx] == idx) {
+                return;
+            }
+        }
+        _channels.add({ :name => name, :idx => idx });
+    }
+
+    public static function addContact(id as String, name as String) as Void {
+        for (var i = 0; i < _contacts.size(); i++) {
+            if (_contacts[i][:id].equals(id)) {
+                return;
+            }
+        }
+        _contacts.add({ :name => name, :id => id, :isChannel => false });
+    }
 }

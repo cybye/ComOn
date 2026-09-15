@@ -3,6 +3,8 @@ import Toybox.Lang;
 import Toybox.System;
 import Toybox.StringUtil;
 import Toybox.Application.Storage;
+import Toybox.Timer;
+import Toybox.WatchUi;
 
 class MeshBleManager {
     public const NUS_SERVICE_UUID = BluetoothLowEnergy.stringToUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -24,9 +26,14 @@ class MeshBleManager {
 
     public var isConnected as Boolean = false;
     public var isScanning as Boolean = false;
+    public var isSimulated as Boolean = false;
     public var deviceName as String = "MeshCore";
     public var lastReceivedMessage as String = "Bereit zum Empfang";
     public var lastSender as String = "Mesh";
+
+    public var echoModeEnabled as Boolean = false;
+    private var _echoTimer as Timer.Timer?;
+    private var _pendingEchoText as String = "";
 
     private var _device as BluetoothLowEnergy.Device?;
     private var _rxCharacteristic as BluetoothLowEnergy.Characteristic?;
@@ -145,7 +152,12 @@ class MeshBleManager {
 
     public function sendChannelText(channelIdx as Number, text as String) as Boolean {
         var payload = MeshProtocol.encodeChannelMessage(channelIdx, text);
-        return sendRaw(payload);
+        var res = sendRaw(payload);
+        if (echoModeEnabled || isSimulated) {
+            triggerEchoReply(text);
+            return true;
+        }
+        return res;
     }
 
     //! Universal Position Send
@@ -158,5 +170,42 @@ class MeshBleManager {
     public function sendSosEmergency(channelIdx as Number) as Boolean {
         var sosStr = TelemetryProvider.getInstance().getFormattedSos();
         return sendChannelText(channelIdx, sosStr);
+    }
+
+    // -----------------------------------------------------------------
+    // SIMULATION & TEST BENCH METHODS
+    // -----------------------------------------------------------------
+    public function simulateConnect(simDeviceName as String) as Void {
+        isSimulated = true;
+        isConnected = true;
+        isScanning = false;
+        deviceName = simDeviceName;
+        WatchUi.requestUpdate();
+    }
+
+    public function simulateDisconnect() as Void {
+        isSimulated = false;
+        isConnected = false;
+        deviceName = "MeshCore";
+        WatchUi.requestUpdate();
+    }
+
+    public function simulateIncomingMessage(sender as String, message as String) as Void {
+        lastReceivedMessage = message;
+        lastSender = sender;
+        MeshNotificationManager.getInstance().showIncomingMessage(sender, message);
+        WatchUi.requestUpdate();
+    }
+
+    public function triggerEchoReply(text as String) as Void {
+        _pendingEchoText = text;
+        if (_echoTimer == null) {
+            _echoTimer = new Timer.Timer();
+        }
+        _echoTimer.start(method(:onEchoTimerExpired), 1200, false);
+    }
+
+    public function onEchoTimerExpired() as Void {
+        simulateIncomingMessage("Node (Echo)", "ACK: " + _pendingEchoText);
     }
 }

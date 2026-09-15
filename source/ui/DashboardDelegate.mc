@@ -83,6 +83,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         menu.addItem(new WatchUi.MenuItem("Nachricht senden", null, "MENU_MSG", null));
         menu.addItem(new WatchUi.MenuItem("Ziel wählen", ContactManager.getTargetDisplayName(), "MENU_TARGET", null));
         menu.addItem(new WatchUi.MenuItem("SOS Notruf", "Notfall Broadcast", "MENU_SOS", null));
+        menu.addItem(new WatchUi.MenuItem("Node-Simulator", "Test-Bench", "MENU_SIM", null));
         menu.addItem(new WatchUi.MenuItem("Node koppeln", "Bluetooth Suche", "MENU_PAIR", null));
         menu.addItem(new WatchUi.MenuItem("App beenden", null, "MENU_EXIT", null));
 
@@ -110,6 +111,8 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.pushView(new TargetSelectMenu(), new TargetSelectDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_SOS")) {
             WatchUi.pushView(new SosView(), new SosDelegate(), WatchUi.SLIDE_UP);
+        } else if (id.equals("MENU_SIM")) {
+            WatchUi.pushView(new NodeSimulatorMenu(), new NodeSimulatorDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_PAIR")) {
             bleMgr.startScan();
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
