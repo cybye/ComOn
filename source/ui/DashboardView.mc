@@ -91,41 +91,48 @@ class DashboardView extends WatchUi.View {
 
         // 2. ENLARGED MESSAGE CARD: Moved slightly higher and expanded downward
         var cardW = (w * 0.82).toNumber();
-        var cardH = 196;
+        var cardH = 202;
         var cardX = cx - (cardW / 2);
-        var cardY = 124; // Starts higher to leave plenty of room inside
+        var cardY = 120; // Starts at y=120, ends at y=322 (47px above Batt at 369)
 
         dc.setColor(0x12151f, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, 14);
         dc.setColor(0x28324a, Graphics.COLOR_TRANSPARENT);
         dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, 14);
 
+        var fontH = dc.getFontHeight(fontXtiny);
+
         // Header inside card
+        var headerY = cardY + 10;
         dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Orange
-        dc.drawText(cx, cardY + 10, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, headerY, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Subtle separator line
+        // Subtle separator line (positioned safely below header text)
+        var sepY = headerY + fontH + 4;
         dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(cardX + 20, cardY + 32, cardX + cardW - 20, cardY + 32);
+        dc.drawLine(cardX + 24, sepY, cardX + cardW - 24, sepY);
 
-        // Multi-line message text with dynamic wrapping and generous line spacing
+        // Footer: Sender name (positioned safely inside bottom border with padding)
+        var footerY = cardY + cardH - fontH - 10;
+        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, footerY, fontXtiny, bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Multi-line message text: Centered vertically between separator and footer
         var maxTextWidth = cardW - 36;
         var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, 4);
-        var fontH = dc.getFontHeight(fontXtiny);
-        var lineSpacing = 8;
+        var lineSpacing = 6;
         var lineHeight = fontH + lineSpacing;
         var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
-        var availableH = cardH - 74; // Space between separator (y+34) and footer (cardH-34)
-        var startY = cardY + 36 + ((availableH - totalTextH) / 2);
+        
+        var msgTop = sepY + 6;
+        var msgBottom = footerY - 6;
+        var availableH = msgBottom - msgTop;
+        var startY = msgTop + ((availableH - totalTextH) / 2);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         for (var i = 0; i < lines.size(); i++) {
             dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
         }
-
-        // Sender footer (just sender name, without 'Absender:')
-        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + cardH - 24, fontXtiny, bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
 
         // 3. Subtle bottom summary line (positioned higher to leave room for bottom nav)
         var bat = tlm.getBatteryPercent().toNumber();
