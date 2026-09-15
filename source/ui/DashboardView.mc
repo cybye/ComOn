@@ -89,11 +89,11 @@ class DashboardView extends WatchUi.View {
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT); // Cyan
         dc.drawText(cx, targetY, fontXtiny, "[" + ContactManager.getTargetDisplayName() + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
-        // 2. ENLARGED MESSAGE CARD: Moved slightly higher and expanded downward
-        var cardW = (w * 0.82).toNumber();
-        var cardH = 202;
+        // 2. ENLARGED MESSAGE CARD: Moved lower and expanded for maximum text lines
+        var cardW = (w * 0.81).toNumber();
+        var cardH = 216;
         var cardX = cx - (cardW / 2);
-        var cardY = 120; // Starts at y=120, ends at y=322 (47px above Batt at 369)
+        var cardY = 136; // Positioned lower to balance screen and maximize height
 
         dc.setColor(0x12151f, Graphics.COLOR_TRANSPARENT);
         dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, 14);
@@ -102,28 +102,41 @@ class DashboardView extends WatchUi.View {
 
         var fontH = dc.getFontHeight(fontXtiny);
 
-        // Header inside card
-        var headerY = cardY + 10;
-        dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Orange
-        dc.drawText(cx, headerY, fontXtiny, "LETZTE NACHRICHT", Graphics.TEXT_JUSTIFY_CENTER);
+        // Header inside card: Replaces "LETZTE NACHRICHT" with actual Sender name
+        var senderTitle = bleMgr.lastSender;
+        if (senderTitle == null || senderTitle.length() == 0 || senderTitle.equals("Mesh")) {
+            if (bleMgr.lastReceivedMessage.equals("Bereit zum Empfang")) {
+                senderTitle = "BEREIT ZUM EMPFANG";
+            } else {
+                senderTitle = "NACHRICHT";
+            }
+        }
+        
+        // Truncate senderTitle if too wide for the card
+        var maxSenderW = cardW - 44;
+        if (dc.getTextWidthInPixels(senderTitle, fontXtiny) > maxSenderW) {
+            while (dc.getTextWidthInPixels(senderTitle + "...", fontXtiny) > maxSenderW && senderTitle.length() > 3) {
+                senderTitle = senderTitle.substring(0, senderTitle.length() - 1);
+            }
+            senderTitle += "...";
+        }
 
-        // Subtle separator line (positioned safely below header text)
+        var headerY = cardY + 10;
+        dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Garmin Orange Accent
+        dc.drawText(cx, headerY, fontXtiny, senderTitle, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Subtle separator line
         var sepY = headerY + fontH + 4;
         dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(cardX + 24, sepY, cardX + cardW - 24, sepY);
+        dc.drawLine(cardX + 20, sepY, cardX + cardW - 20, sepY);
 
-        // Footer: Sender name (positioned safely inside bottom border with padding)
-        var footerY = cardY + cardH - fontH - 10;
-        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, footerY, fontXtiny, bleMgr.lastSender, Graphics.TEXT_JUSTIFY_CENTER);
-
-        // Multi-line message text: Centered vertically between separator and footer
-        var maxTextWidth = cardW - 36;
-        var lineSpacing = 5;
+        // Multi-line message text: Full height used (no bottom sender footer needed)
+        var maxTextWidth = cardW - 32;
+        var lineSpacing = 4;
         var lineHeight = fontH + lineSpacing;
         
         var msgTop = sepY + 6;
-        var msgBottom = footerY - 6;
+        var msgBottom = cardY + cardH - 10;
         var availableH = msgBottom - msgTop;
         var maxLines = (availableH / lineHeight).toNumber();
         if (maxLines < 1) { maxLines = 1; }
@@ -137,14 +150,14 @@ class DashboardView extends WatchUi.View {
             dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
         }
 
-        // 3. Multi-segment status footer (Battery | LoRa RSSI | Mesh Nodes)
+        // 3. Compact status footer with vector symbols: [Bat-Icon] 85% | -84 dBm | [Mesh-Icon] 3
         var bat = tlm.getBatteryPercent().toNumber();
-        var batText = "Batt: " + bat + "%";
+        var batText = bat.toString() + "%";
         var divText = " | ";
 
         var loraText = "Offline";
         var loraColor = 0x666666;
-        var nodeText = "0 Nodes";
+        var nodeText = "0";
         var nodeColor = 0x666666;
 
         if (bleMgr.isConnected) {
@@ -162,23 +175,30 @@ class DashboardView extends WatchUi.View {
                 loraText = "OK";
                 loraColor = 0x00e676;
             }
-            nodeText = bleMgr.peerCount.toString() + " Nodes";
+            nodeText = bleMgr.peerCount.toString();
             nodeColor = 0x00d4ff; // Cyan
         }
 
-        var wBat = dc.getTextWidthInPixels(batText, fontXtiny);
+        var iconBatW = 20; // 18 + 2 terminal
+        var gapIconText = 4;
+        var iconNodeW = 13;
+
+        var wBatText = dc.getTextWidthInPixels(batText, fontXtiny);
         var wDiv = dc.getTextWidthInPixels(divText, fontXtiny);
         var wLora = dc.getTextWidthInPixels(loraText, fontXtiny);
-        var wNode = dc.getTextWidthInPixels(nodeText, fontXtiny);
+        var wNodeText = dc.getTextWidthInPixels(nodeText, fontXtiny);
 
-        var totalStatusW = wBat + wDiv + wLora + wDiv + wNode;
+        var totalStatusW = iconBatW + gapIconText + wBatText + wDiv + wLora + wDiv + iconNodeW + gapIconText + wNodeText;
         var curX = cx - (totalStatusW / 2);
-        var statusY = h - 85;
+        var statusY = h - 78;
+        var iconY = statusY + ((fontH - 10) / 2);
 
-        // Draw Bat
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
+        // Draw Battery Icon & %
+        drawBatteryIcon(dc, curX, iconY, bat);
+        curX += iconBatW + gapIconText;
+        dc.setColor(0xaaaaaa, Graphics.COLOR_TRANSPARENT);
         dc.drawText(curX, statusY, fontXtiny, batText, Graphics.TEXT_JUSTIFY_LEFT);
-        curX += wBat;
+        curX += wBatText;
 
         // Draw Div 1
         dc.setColor(0x444444, Graphics.COLOR_TRANSPARENT);
@@ -195,7 +215,9 @@ class DashboardView extends WatchUi.View {
         dc.drawText(curX, statusY, fontXtiny, divText, Graphics.TEXT_JUSTIFY_LEFT);
         curX += wDiv;
 
-        // Draw Node Count
+        // Draw Mesh Nodes Icon & Count
+        drawMeshNodesIcon(dc, curX, iconY, nodeColor);
+        curX += iconNodeW + gapIconText;
         dc.setColor(nodeColor, Graphics.COLOR_TRANSPARENT);
         dc.drawText(curX, statusY, fontXtiny, nodeText, Graphics.TEXT_JUSTIFY_LEFT);
     }
@@ -409,5 +431,44 @@ class DashboardView extends WatchUi.View {
         }
 
         return lines;
+    }
+
+    private function drawBatteryIcon(dc as Graphics.Dc, x as Number, y as Number, percent as Number) as Void {
+        var bw = 18;
+        var bh = 10;
+        
+        // Battery outer border
+        dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
+        dc.drawRoundedRectangle(x, y, bw, bh, 2);
+        // Battery terminal bump
+        dc.fillRectangle(x + bw, y + 3, 2, 4);
+
+        // Fill bar based on percentage
+        var fillW = ((bw - 4) * percent / 100).toNumber();
+        if (fillW > (bw - 4)) { fillW = bw - 4; }
+        if (fillW < 1 && percent > 0) { fillW = 1; }
+
+        var fillColor = 0x00e676; // Green
+        if (percent <= 20) {
+            fillColor = 0xff5555; // Red
+        } else if (percent <= 40) {
+            fillColor = 0xffea00; // Yellow
+        }
+
+        dc.setColor(fillColor, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x + 2, y + 2, fillW, bh - 4);
+    }
+
+    private function drawMeshNodesIcon(dc as Graphics.Dc, x as Number, y as Number, color as Number) as Void {
+        // 3 connected mesh nodes (triangle topology graph)
+        dc.setColor(0x445566, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(x + 6, y + 1, x + 1, y + 9);
+        dc.drawLine(x + 6, y + 1, x + 11, y + 9);
+        dc.drawLine(x + 1, y + 9, x + 11, y + 9);
+
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(x + 6, y + 1, 2);
+        dc.fillCircle(x + 1, y + 9, 2);
+        dc.fillCircle(x + 11, y + 9, 2);
     }
 }

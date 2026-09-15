@@ -74,8 +74,8 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             var coords = clickEvent.getCoordinates();
             var tx = coords[0];
             var ty = coords[1];
-            // Message card bounds: x: 35..420, y: 115..330
-            if (tx >= 35 && tx <= 420 && ty >= 115 && ty <= 330) {
+            // Message card bounds: x: 35..420, y: 125..355
+            if (tx >= 35 && tx <= 420 && ty >= 125 && ty <= 355) {
                 var sender = getBleManager().lastSender;
                 WatchUi.pushView(new MessageActionMenu(sender), new MessageActionDelegate(sender), WatchUi.SLIDE_LEFT);
                 return true;
