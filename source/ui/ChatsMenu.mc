@@ -14,16 +14,23 @@ class ChatsMenu extends WatchUi.Menu2 {
             var tid = "CH_" + idx;
 
             var isActive = (!ContactManager.isContactTarget && ContactManager.selectedChannelIdx == idx);
+            var unread = ChatHistoryManager.getUnreadCountForTarget(tid);
             var lastMsg = ChatHistoryManager.getLastMessageForTarget(tid);
 
             var sub = "";
+            if (unread > 0) {
+                sub += "[" + unread + " neu] ";
+            }
+            if (isActive) {
+                sub += "✔ ";
+            }
+
             if (lastMsg != null) {
-                var prefix = isActive ? "✔ " : "";
                 var s = lastMsg[:sender] as String;
                 var txt = lastMsg[:text] as String;
-                sub = prefix + s + ": " + txt;
+                sub += s + ": " + txt;
             } else {
-                sub = isActive ? "✔ Aktiv (Kanal)" : "Kanal";
+                sub += "Kanal";
             }
 
             addItem(new WatchUi.MenuItem(name, sub, tid, null));
@@ -38,16 +45,23 @@ class ChatsMenu extends WatchUi.Menu2 {
             var tid = "CT_" + cid;
 
             var isActive = (ContactManager.isContactTarget && ContactManager.selectedContactId != null && ContactManager.selectedContactId.equals(cid));
+            var unread = ChatHistoryManager.getUnreadCountForTarget(tid);
             var lastMsg = ChatHistoryManager.getLastMessageForTarget(tid);
 
             var sub = "";
+            if (unread > 0) {
+                sub += "[" + unread + " neu] ";
+            }
+            if (isActive) {
+                sub += "✔ ";
+            }
+
             if (lastMsg != null) {
-                var prefix = isActive ? "✔ " : "";
                 var s = lastMsg[:sender] as String;
                 var txt = lastMsg[:text] as String;
-                sub = prefix + s + ": " + txt;
+                sub += s + ": " + txt;
             } else {
-                sub = isActive ? "✔ Aktiv (1:1)" : "1:1 Kontakt";
+                sub += "1:1 Kontakt";
             }
 
             addItem(new WatchUi.MenuItem(cname, sub, tid, null));
@@ -72,8 +86,9 @@ class ChatsDelegate extends WatchUi.Menu2InputDelegate {
             ContactManager.selectContact(ctId, label);
         }
 
-        // Open Chat-Thread for this channel / contact
-        WatchUi.pushView(new ChatThreadMenu(id, label), new ChatThreadDelegate(id, label), WatchUi.SLIDE_LEFT);
+        // Open graphical Chat-Thread View
+        var view = new ChatThreadView(id, label);
+        WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
     }
 
     function onBack() as Void {

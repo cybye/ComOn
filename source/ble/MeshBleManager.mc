@@ -145,7 +145,7 @@ class MeshBleManager {
 
             // Save to Chat History
             var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
-            ChatHistoryManager.addMessage(tid, lastSender, msgText, false, null);
+            ChatHistoryManager.addMessage(tid, lastSender, msgText, false);
 
             // Show interactive notification via Toybox.Notifications
             MeshNotificationManager.getInstance().showIncomingMessage(lastSender, msgText);
@@ -175,7 +175,7 @@ class MeshBleManager {
 
     public function sendChannelText(channelIdx as Number, text as String) as Boolean {
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + channelIdx);
-        ChatHistoryManager.addMessage(tid, "Ich", text, true, null);
+        ChatHistoryManager.addMessage(tid, "Ich", text, true);
 
         var payload = MeshProtocol.encodeChannelMessage(channelIdx, text);
         var res = sendRaw(payload);
@@ -256,7 +256,7 @@ class MeshBleManager {
         lastSender = sender;
 
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
-        ChatHistoryManager.addMessage(tid, sender, message, false, null);
+        ChatHistoryManager.addMessage(tid, sender, message, false);
 
         MeshNotificationManager.getInstance().showIncomingMessage(sender, message);
         WatchUi.requestUpdate();
