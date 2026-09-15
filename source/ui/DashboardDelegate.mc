@@ -22,7 +22,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    //! DOWN button / Swipe Up: Switch to Telemetry Screen
+    //! DOWN button (Bottom Left) / Swipe Up: Switch to Telemetry Screen
     function onNextPage() as Boolean {
         if (_view.pageIndex == 0) {
             _view.pageIndex = 1;
@@ -32,7 +32,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    //! UP button / Swipe Down: Switch to Chat Screen
+    //! UP button (Middle Left) / Swipe Down: Switch to Chat Screen
     function onPreviousPage() as Boolean {
         if (_view.pageIndex == 1) {
             _view.pageIndex = 0;
@@ -43,6 +43,31 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             sendPositionDirect();
             return true;
         }
+    }
+
+    //! BACK button (Bottom Right)
+    function onBack() as Boolean {
+        if (_view.pageIndex == 1) {
+            // Return from Telemetry to Chat screen
+            _view.pageIndex = 0;
+            WatchUi.requestUpdate();
+            return true;
+        }
+        // If on Chat screen, standard Garmin exit
+        return false;
+    }
+
+    //! Explicit key handler for maximum simulator & hardware compatibility
+    function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
+        var key = keyEvent.getKey();
+        if (key == WatchUi.KEY_DOWN) {
+            return onNextPage();
+        } else if (key == WatchUi.KEY_UP) {
+            return onPreviousPage();
+        } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            return onSelect();
+        }
+        return false;
     }
 
     public function sendPositionDirect() as Void {
