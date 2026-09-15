@@ -180,9 +180,9 @@ class DashboardView extends WatchUi.View {
 
         // Box 4: Batterie
         drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "AKKU", 0x14161c);
-        var bat = tlm.getBatteryPercent().toNumber();
+        var batStr = tlm.getBatteryPercent().format("%.0f") + "%";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(box2X + (boxW/2), row2Y + 22, fontSmall, bat + "%", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(box2X + (boxW/2), row2Y + 22, fontSmall, batStr, Graphics.TEXT_JUSTIFY_CENTER);
         dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
         dc.drawText(box2X + (boxW/2), row2Y + 48, fontXtiny, "Uhr", Graphics.TEXT_JUSTIFY_CENTER);
 
