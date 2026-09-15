@@ -98,17 +98,25 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         var bleMgr = getBleManager();
         var lastSender = bleMgr.lastSender;
 
-        // Quick Reply item at top of menu (START -> START for instant reply)
+        // 1. Quick Reply item at top of menu (START -> START for instant reply)
         var replyLabel = (!lastSender.equals("Mesh")) ? ("Antwort an " + lastSender) : "Antworten";
         menu.addItem(new WatchUi.MenuItem(replyLabel, "Tastatur", "MENU_REPLY", null));
 
-        menu.addItem(new WatchUi.MenuItem("Position senden", null, "MENU_POS", null));
-        menu.addItem(new WatchUi.MenuItem("Nachricht senden", null, "MENU_MSG", null));
-        menu.addItem(new WatchUi.MenuItem("Ziel wählen", ContactManager.getTargetDisplayName(), "MENU_TARGET", null));
-        menu.addItem(new WatchUi.MenuItem("Tastatur-Typ", KeyboardHelper.getModeName(KeyboardHelper.getKeyboardMode()), "MENU_SETTINGS_KEYBOARD", null));
+        // 2. Chats (replaces Ziel wählen and contains thread history)
+        var targetLabel = "Aktiv: " + ContactManager.getTargetDisplayName();
+        menu.addItem(new WatchUi.MenuItem("Chats", targetLabel, "MENU_CHATS", null));
+
+        // 3. Send message & position
+        menu.addItem(new WatchUi.MenuItem("Nachricht senden", "Aus Liste", "MENU_MSG", null));
+        menu.addItem(new WatchUi.MenuItem("Position senden", "GPS + Vitaldaten", "MENU_POS", null));
+
+        // 4. SOS Emergency
         menu.addItem(new WatchUi.MenuItem("SOS Notruf", "Notfall Broadcast", "MENU_SOS", null));
-        menu.addItem(new WatchUi.MenuItem("Node-Simulator", "Test-Bench", "MENU_SIM", null));
-        menu.addItem(new WatchUi.MenuItem("Node koppeln", "Bluetooth Suche", "MENU_PAIR", null));
+
+        // 5. Settings Submenu (Tastatur, Pairing, Simulator)
+        menu.addItem(new WatchUi.MenuItem("Einstellungen", "Tastatur, Node...", "MENU_SETTINGS", null));
+
+        // 6. Exit
         menu.addItem(new WatchUi.MenuItem("App beenden", null, "MENU_EXIT", null));
 
         WatchUi.pushView(menu, new MainMenuDelegate(), WatchUi.SLIDE_LEFT);
@@ -128,24 +136,18 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
         if (id.equals("MENU_REPLY")) {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             KeyboardHelper.openKeyboard("");
+        } else if (id.equals("MENU_CHATS")) {
+            WatchUi.pushView(new ChatsMenu(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
+        } else if (id.equals("MENU_MSG")) {
+            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_POS")) {
             var ok = bleMgr.sendCurrentPosition(chIdx);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             WatchUi.showToast(ok ? "Position gesendet" : "Nicht verbunden", null);
-        } else if (id.equals("MENU_MSG")) {
-            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_TARGET")) {
-            WatchUi.pushView(new TargetSelectMenu(), new TargetSelectDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_SETTINGS_KEYBOARD")) {
-            WatchUi.pushView(new KeyboardSettingsMenu(), new KeyboardSettingsDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_SOS")) {
             WatchUi.pushView(new SosView(), new SosDelegate(), WatchUi.SLIDE_UP);
-        } else if (id.equals("MENU_SIM")) {
-            WatchUi.pushView(new NodeSimulatorMenu(), new NodeSimulatorDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_PAIR")) {
-            bleMgr.startScan();
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast("Suche Node...", null);
+        } else if (id.equals("MENU_SETTINGS")) {
+            WatchUi.pushView(new SettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_EXIT")) {
             System.exit();
         }
