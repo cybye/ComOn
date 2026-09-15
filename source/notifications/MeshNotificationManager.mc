@@ -57,8 +57,7 @@ class MeshNotificationManager {
             var chIdx = ContactManager.selectedChannelIdx;
 
             if (actionId.equals("ACTION_REPLY")) {
-                var keyView = new QwertyKeyboardView("");
-                WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
+                KeyboardHelper.openKeyboard("");
             } else if (actionId.equals("ACTION_SEND_POS")) {
                 bleMgr.sendCurrentPosition(chIdx);
             } else if (actionId.equals("ACTION_SEND_OK")) {

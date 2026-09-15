@@ -33,8 +33,7 @@ class MessageActionDelegate extends WatchUi.Menu2InputDelegate {
                 ContactManager.selectContact(_sender, _sender);
             }
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            var keyView = new QwertyKeyboardView("");
-            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
+            KeyboardHelper.openKeyboard("");
         } else if (id.equals("ACT_REPLY_CANNED")) {
             WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("ACT_REPLY_POS")) {

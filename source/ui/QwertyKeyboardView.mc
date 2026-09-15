@@ -7,15 +7,17 @@ class QwertyKeyboardView extends WatchUi.View {
     public var currentText as String = "";
     public var isShift as Boolean = true;
     public var isSymbols as Boolean = false;
+    public var isQwerty as Boolean = true;
     public var keys as Array<Dictionary> = [] as Array<Dictionary>;
     public var activeKeyId as String? = null;
 
     private var _cursorTimer as Timer.Timer?;
     public var cursorBlink as Boolean = true;
 
-    function initialize(initialText as String) {
+    function initialize(initialText as String, qwerty as Boolean) {
         View.initialize();
         currentText = initialText;
+        isQwerty = qwerty;
     }
 
     function onShow() as Void {
@@ -43,12 +45,14 @@ class QwertyKeyboardView extends WatchUi.View {
         keys = [] as Array<Dictionary>;
         var cx = 227;
 
-        // Row 1 (y = 110, h = 56) - 10 keys: Q W E R T Y U I O P
+        // Row 1 (y = 110, h = 56)
         var r1Labels = [] as Array<String>;
         if (isSymbols) {
             r1Labels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
-        } else {
+        } else if (isQwerty) {
             r1Labels = isShift ? ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"] : ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"];
+        } else {
+            r1Labels = isShift ? ["Q", "W", "E", "R", "T", "Z", "U", "I", "O", "P"] : ["q", "w", "e", "r", "t", "z", "u", "i", "o", "p"];
         }
 
         var r1W = 34;
@@ -114,8 +118,10 @@ class QwertyKeyboardView extends WatchUi.View {
         var r3Labels = [] as Array<String>;
         if (isSymbols) {
             r3Labels = ["?", "!", "\"", "'", "+", "=", "*"];
-        } else {
+        } else if (isQwerty) {
             r3Labels = isShift ? ["Z", "X", "C", "V", "B", "N", "M"] : ["z", "x", "c", "v", "b", "n", "m"];
+        } else {
+            r3Labels = isShift ? ["Y", "X", "C", "V", "B", "N", "M"] : ["y", "x", "c", "v", "b", "n", "m"];
         }
 
         var r3W = 36;
@@ -207,8 +213,9 @@ class QwertyKeyboardView extends WatchUi.View {
 
         // 1. Target recipient banner at very top
         var targetName = ContactManager.getTargetDisplayName();
+        var modeTag = isQwerty ? "QWERTY" : "QWERTZ";
         dc.setColor(0xffaa00, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 16, fontXtiny, "An: " + targetName, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, 16, fontXtiny, "An: " + targetName + " [" + modeTag + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
         // 2. Text Input Preview Box
         var boxW = 290;

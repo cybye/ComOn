@@ -51,8 +51,7 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
 
         if (id.equals("MSG_CUSTOM")) {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            var keyView = new QwertyKeyboardView("");
-            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
+            KeyboardHelper.openKeyboard("");
             return;
         }
 
