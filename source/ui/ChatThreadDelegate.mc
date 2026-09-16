@@ -15,8 +15,8 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
-        // START button opens reply keyboard directly
-        KeyboardHelper.openKeyboard("");
+        // START button opens reply menu (direct answers + keyboard option)
+        WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
         return true;
     }
 
@@ -49,7 +49,7 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
 
         // Bottom [Antworten] button bounds: x: 100..350, y: 370..435
         if (tx >= 100 && tx <= 350 && ty >= 370 && ty <= 435) {
-            KeyboardHelper.openKeyboard("");
+            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
             return true;
         }
 

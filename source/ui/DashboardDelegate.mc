@@ -100,7 +100,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
 
         // 1. Quick Reply item at top of menu (START -> START for instant reply)
         var replyLabel = (!lastSender.equals("Mesh")) ? ("Antwort an " + lastSender) : "Antworten";
-        menu.addItem(new WatchUi.MenuItem(replyLabel, "Tastatur", "MENU_REPLY", null));
+        menu.addItem(new WatchUi.MenuItem(replyLabel, "Direktantwort / Tastatur", "MENU_REPLY", null));
 
         // 2. Chats (replaces Ziel wählen and contains thread history)
         var targetLabel = "Aktiv: " + ContactManager.getTargetDisplayName();
@@ -134,8 +134,11 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
         var chIdx = ContactManager.selectedChannelIdx;
 
         if (id.equals("MENU_REPLY")) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            KeyboardHelper.openKeyboard("");
+            var lastSender = bleMgr.lastSender;
+            if (!lastSender.equals("Mesh") && !lastSender.equals("Node (Echo)")) {
+                ContactManager.selectContact(lastSender, lastSender);
+            }
+            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_CHATS")) {
             WatchUi.pushView(new ChatsMenu(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_MSG")) {

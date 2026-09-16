@@ -3,7 +3,7 @@ import Toybox.Lang;
 
 class CannedMessageMenu extends WatchUi.Menu2 {
     function initialize() {
-        Menu2.initialize({ :title => "Nachricht" });
+        Menu2.initialize({ :title => "Antworten" });
 
         // Position at the very top of message list
         addItem(new WatchUi.MenuItem("Freitext schreiben...", "Tastatur", "MSG_CUSTOM", null));
