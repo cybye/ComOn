@@ -37,12 +37,29 @@ class ContactManager {
         try {
             var cachedCh = Storage.getValue(STORAGE_CHANNELS);
             if (cachedCh != null && (cachedCh instanceof Array) && (cachedCh as Array).size() > 0) {
-                _channels = cachedCh as Array<Dictionary>;
+                var list = cachedCh as Array<Dictionary>;
+                var loadedCh = [] as Array<Dictionary>;
+                for (var i = 0; i < list.size(); i++) {
+                    var item = list[i];
+                    loadedCh.add({ :name => item["name"], :idx => item["idx"] });
+                }
+                _channels = loadedCh;
             }
 
             var cachedCt = Storage.getValue(STORAGE_CONTACTS);
             if (cachedCt != null && (cachedCt instanceof Array) && (cachedCt as Array).size() > 0) {
-                _contacts = cachedCt as Array<Dictionary>;
+                var listCt = cachedCt as Array<Dictionary>;
+                var loadedCt = [] as Array<Dictionary>;
+                for (var j = 0; j < listCt.size(); j++) {
+                    var itemCt = listCt[j];
+                    loadedCt.add({
+                        :name => itemCt["name"],
+                        :id => itemCt["id"],
+                        :isChannel => itemCt["isChannel"],
+                        :idx => itemCt["idx"]
+                    });
+                }
+                _contacts = loadedCt;
             }
 
             var syncT = Storage.getValue(STORAGE_SYNC_TIME);
@@ -50,17 +67,34 @@ class ContactManager {
                 _lastContactSyncTime = syncT as Number;
             }
         } catch (e) {
-            System.println("ContactManager storage read error");
+            System.println("ContactManager storage read notice");
         }
     }
 
     public static function saveToStorage() as Void {
         try {
-            Storage.setValue(STORAGE_CHANNELS, _channels);
-            Storage.setValue(STORAGE_CONTACTS, _contacts);
+            var chList = [] as Array<Dictionary>;
+            for (var i = 0; i < _channels.size(); i++) {
+                var c = _channels[i];
+                chList.add({ "name" => c[:name], "idx" => c[:idx] });
+            }
+
+            var ctList = [] as Array<Dictionary>;
+            for (var j = 0; j < _contacts.size(); j++) {
+                var ct = _contacts[j];
+                ctList.add({
+                    "name" => ct[:name],
+                    "id" => ct[:id],
+                    "isChannel" => (ct[:isChannel] != null) ? ct[:isChannel] : false,
+                    "idx" => (ct[:idx] != null) ? ct[:idx] : 0
+                });
+            }
+
+            Storage.setValue(STORAGE_CHANNELS, chList);
+            Storage.setValue(STORAGE_CONTACTS, ctList);
             Storage.setValue(STORAGE_SYNC_TIME, _lastContactSyncTime);
         } catch (e) {
-            System.println("ContactManager storage write error");
+            System.println("ContactManager storage write notice");
         }
     }
 

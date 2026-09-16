@@ -18,7 +18,20 @@ class ChatHistoryManager {
         try {
             var stored = Storage.getValue(STORAGE_KEY);
             if (stored != null && (stored instanceof Array)) {
-                _messages = stored as Array<Dictionary>;
+                var list = stored as Array<Dictionary>;
+                var loaded = [] as Array<Dictionary>;
+                for (var i = 0; i < list.size(); i++) {
+                    var it = list[i];
+                    loaded.add({
+                        :targetId => it["targetId"],
+                        :sender => it["sender"],
+                        :text => it["text"],
+                        :isOutgoing => it["isOutgoing"],
+                        :time => it["time"],
+                        :isRead => it["isRead"]
+                    });
+                }
+                _messages = loaded;
             }
         } catch (e) {
             _messages = [] as Array<Dictionary>;
@@ -60,7 +73,19 @@ class ChatHistoryManager {
         }
 
         try {
-            Storage.setValue(STORAGE_KEY, _messages);
+            var serialized = [] as Array<Dictionary>;
+            for (var mIdx = 0; mIdx < _messages.size(); mIdx++) {
+                var m = _messages[mIdx];
+                serialized.add({
+                    "targetId" => m[:targetId],
+                    "sender" => m[:sender],
+                    "text" => m[:text],
+                    "isOutgoing" => m[:isOutgoing],
+                    "time" => m[:time],
+                    "isRead" => m[:isRead]
+                });
+            }
+            Storage.setValue(STORAGE_KEY, serialized);
         } catch (e) {
             // ignore
         }
