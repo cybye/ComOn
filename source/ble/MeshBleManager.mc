@@ -148,7 +148,7 @@ class MeshBleManager {
             ChatHistoryManager.addMessage(tid, lastSender, msgText, false);
 
             // Show interactive notification via Toybox.Notifications
-            MeshNotificationManager.getInstance().showIncomingMessage(lastSender, msgText);
+            MeshNotificationManager.getInstance().showIncomingMessage(lastSender, msgText, tid);
         }
     }
 
@@ -258,7 +258,7 @@ class MeshBleManager {
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
         ChatHistoryManager.addMessage(tid, sender, message, false);
 
-        MeshNotificationManager.getInstance().showIncomingMessage(sender, message);
+        MeshNotificationManager.getInstance().showIncomingMessage(sender, message, tid);
         WatchUi.requestUpdate();
     }
 

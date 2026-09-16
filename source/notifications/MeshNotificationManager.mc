@@ -6,6 +6,8 @@ import Toybox.WatchUi;
 
 class MeshNotificationManager {
     private static var _instance as MeshNotificationManager? = null;
+    private var _lastSender as String = "Mesh";
+    private var _lastTargetId as String = "CH_0";
 
     public static function getInstance() as MeshNotificationManager {
         if (_instance == null) {
@@ -25,7 +27,10 @@ class MeshNotificationManager {
         }
     }
 
-    public function showIncomingMessage(sender as String, text as String) as Void {
+    public function showIncomingMessage(sender as String, text as String, targetId as String or Null) as Void {
+        _lastSender = sender;
+        _lastTargetId = (targetId != null) ? targetId : (ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx));
+
         // Haptic feedback
         if (Attention has :vibrate) {
             var vibeProfile = [ new Attention.VibeProfile(100, 300), new Attention.VibeProfile(0, 150), new Attention.VibeProfile(100, 300) ];
@@ -35,10 +40,10 @@ class MeshNotificationManager {
         var options = {
             :body => text,
             :actions => [
+                { :label => "Chat öffnen", :data => "ACTION_CHAT" },
                 { :label => "Antworten", :data => "ACTION_REPLY" },
                 { :label => "Position senden", :data => "ACTION_SEND_POS" },
-                { :label => "Alles OK", :data => "ACTION_SEND_OK" },
-                { :label => "Schließen", :data => "ACTION_DISMISS" }
+                { :label => "Alles OK", :data => "ACTION_SEND_OK" }
             ] as Array<Notifications.Action>
         };
 
@@ -56,8 +61,18 @@ class MeshNotificationManager {
             var bleMgr = getBleManager();
             var chIdx = ContactManager.selectedChannelIdx;
 
-            if (actionId.equals("ACTION_REPLY")) {
-                KeyboardHelper.openKeyboard("");
+            // Ensure contact is selected if it's a known contact
+            if (!_lastSender.equals("Mesh") && !_lastSender.equals("Node (Echo)")) {
+                ContactManager.selectContact(_lastSender, _lastSender);
+            }
+
+            if (actionId.equals("ACTION_CHAT")) {
+                var view = new ChatThreadView(_lastTargetId, _lastSender);
+                WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
+            } else if (actionId.equals("ACTION_REPLY")) {
+                var view = new ChatThreadView(_lastTargetId, _lastSender);
+                WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
+                WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
             } else if (actionId.equals("ACTION_SEND_POS")) {
                 bleMgr.sendCurrentPosition(chIdx);
             } else if (actionId.equals("ACTION_SEND_OK")) {
