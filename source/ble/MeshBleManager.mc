@@ -242,6 +242,11 @@ class MeshBleManager {
         lastReceivedMessage = mText;
         lastSender = s;
 
+        if (isSimulated) {
+            loraRssi = virtualNode.loraRssi;
+            loraSnr = virtualNode.loraSnr;
+        }
+
         // Save to Chat History
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
         ChatHistoryManager.addMessage(tid, lastSender, mText, false);

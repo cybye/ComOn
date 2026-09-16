@@ -8,11 +8,11 @@ class VirtualMeshNode {
     private static var _instance as VirtualMeshNode? = null;
 
     public var isBleConnected as Boolean = false;
-    public var echoMode as Boolean = false;
+    public var echoMode as Boolean = true; // Enabled by default
     public var batteryMv as Number = 3940;
     public var batteryPercent as Number = 84;
-    public var loraRssi as Number = -82;
-    public var loraSnr as Number = 7;
+    public var loraRssi as Number = -76;
+    public var loraSnr as Number = 8;
     public var nodeTime as Number = 0;
 
     private var _inbox as Array<Dictionary> = [] as Array<Dictionary>;
@@ -226,7 +226,13 @@ class VirtualMeshNode {
     }
 
     public function onEchoTimerTrigger() as Void {
-        var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText) : "Empfang OK";
+        // Vary RSSI (-74 to -82 dBm) and SNR (+6 to +9 dB) realistically per transmission
+        var nowVal = Time.now().value();
+        loraRssi = -74 - (nowVal % 9);
+        loraSnr = 6 + ((nowVal / 2) % 4);
+
+        var sigStr = loraRssi.toString() + "dBm, SNR +" + loraSnr.toString() + "dB";
+        var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText + " [" + sigStr + "]") : ("Empfang OK [" + sigStr + "]");
         injectMessage("Echo", replyText, 0);
     }
 
