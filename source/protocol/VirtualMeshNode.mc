@@ -231,8 +231,7 @@ class VirtualMeshNode {
         loraRssi = -74 - (nowVal % 9);
         loraSnr = 6 + ((nowVal / 2) % 4);
 
-        var sigStr = loraRssi.toString() + "dBm, SNR +" + loraSnr.toString() + "dB";
-        var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText + " [" + sigStr + "]") : ("Empfang OK [" + sigStr + "]");
+        var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText) : "Empfang OK";
         injectMessage("Echo", replyText, 0);
     }
 

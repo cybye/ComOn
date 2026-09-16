@@ -18,7 +18,8 @@ class NodeSimulatorMenu extends WatchUi.Menu2 {
         addItem(new WatchUi.MenuItem("SOS Notruf einspeisen", "Notfall Broadcast", "SIM_SOS", null));
         addItem(new WatchUi.MenuItem("Neuer Kontakt (Delta)", "Bergwacht Team 2", "SIM_DISCOVER", null));
         addItem(new WatchUi.MenuItem("Echo / Auto-Reply", echoSub, "SIM_ECHO", null));
-        addItem(new WatchUi.MenuItem("Signal durchschalten", bleMgr.getSignalStatusString(), "SIM_SIGNAL", null));
+        var sigSub = bleMgr.isConnected ? ("Status: AN (" + bleMgr.getSignalStatusString() + ")") : "Getrennt (Offline)";
+        addItem(new WatchUi.MenuItem("Signal durchschalten", sigSub, "SIM_SIGNAL", null));
     }
 }
 
@@ -64,8 +65,9 @@ class NodeSimulatorDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.showToast(vNode.echoMode ? "Echo: AN (Antwort nach 1.5s)" : "Echo: AUS", null);
         } else if (id.equals("SIM_SIGNAL")) {
             bleMgr.cycleSimulatedSignal();
-            item.setSubLabel(bleMgr.getSignalStatusString());
-            WatchUi.showToast("Signal: " + bleMgr.getSignalStatusString(), null);
+            var sigStr = bleMgr.getSignalStatusString();
+            item.setSubLabel("Status: AN (" + sigStr + ")");
+            WatchUi.showToast("Signal: " + sigStr, null);
         }
     }
 
