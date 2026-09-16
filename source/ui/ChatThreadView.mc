@@ -140,7 +140,7 @@ class ChatThreadView extends WatchUi.View {
                 // Safety space check: truncate sender if name + time is too wide
                 var availHeaderW = bw - 20;
                 var timeW = dc.getTextWidthInPixels(timeStr, fontXtiny);
-                var maxSenderW = availHeaderW - timeW - 14;
+                var maxSenderW = availHeaderW - timeW - 6;
                 var displaySender = sender;
                 if (dc.getTextWidthInPixels(displaySender, fontXtiny) > maxSenderW) {
                     while (displaySender.length() > 2 && dc.getTextWidthInPixels(displaySender + "..", fontXtiny) > maxSenderW) {

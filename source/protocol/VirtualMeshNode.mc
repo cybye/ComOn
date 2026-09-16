@@ -219,19 +219,23 @@ class VirtualMeshNode {
         return _inbox.size();
     }
 
+    private var _lastEchoText as String = "";
+
     private function scheduleEchoReply(originalText as String, channelIdx as Number) as Void {
+        _lastEchoText = originalText;
         _echoTimer = new Timer.Timer();
-        _echoTimer.start(method(:onEchoTimerTrigger), 1500, false);
+        _echoTimer.start(method(:onEchoTimerTrigger), 1200, false);
     }
 
     public function onEchoTimerTrigger() as Void {
-        injectMessage("Node (Echo)", "Empfangen: " + Time.now().value(), 0);
+        var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText) : "Empfang OK";
+        injectMessage("Echo", replyText, 0);
     }
 
     private function sendNotifyAsync(data as Array<Number>) as Void {
         _pendingNotifyData = data;
         _asyncTimer = new Timer.Timer();
-        _asyncTimer.start(method(:onAsyncTimerTrigger), 25, false); // 25ms realistic BLE latency
+        _asyncTimer.start(method(:onAsyncTimerTrigger), 50, false); // 50ms (ConnectIQ min timer)
     }
 
     public function onAsyncTimerTrigger() as Void {
