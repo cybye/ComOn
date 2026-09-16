@@ -32,13 +32,18 @@ class MeshNotificationManager {
         _lastTargetId = (targetId != null) ? targetId : (ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx));
 
         // Haptic feedback
-        if (Attention has :vibrate) {
-            var vibeProfile = [ new Attention.VibeProfile(100, 300), new Attention.VibeProfile(0, 150), new Attention.VibeProfile(100, 300) ];
-            Attention.vibrate(vibeProfile);
+        try {
+            if (Attention has :vibrate) {
+                var vibeProfile = [ new Attention.VibeProfile(100, 250), new Attention.VibeProfile(0, 100), new Attention.VibeProfile(100, 250) ];
+                Attention.vibrate(vibeProfile);
+            }
+        } catch (e) {
+            // ignore
         }
 
         var options = {
             :body => text,
+            :dismissPrevious => true,
             :actions => [
                 { :label => "Chat öffnen", :data => "ACTION_CHAT" },
                 { :label => "Antworten", :data => "ACTION_REPLY" },

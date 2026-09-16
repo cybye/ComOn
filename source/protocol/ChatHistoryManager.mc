@@ -72,6 +72,10 @@ class ChatHistoryManager {
             _messages.remove(_messages[0]);
         }
 
+        persistMessages();
+    }
+
+    private static function persistMessages() as Void {
         try {
             var serialized = [] as Array<Dictionary>;
             for (var mIdx = 0; mIdx < _messages.size(); mIdx++) {
@@ -146,11 +150,7 @@ class ChatHistoryManager {
             }
         }
         if (changed) {
-            try {
-                Storage.setValue(STORAGE_KEY, _messages);
-            } catch (e) {
-                // ignore
-            }
+            persistMessages();
         }
     }
 
