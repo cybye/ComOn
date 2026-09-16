@@ -22,7 +22,7 @@ class ChatsMenu extends WatchUi.Menu2 {
                 sub += "[" + unread + " neu] ";
             }
             if (isActive) {
-                sub += "✔ ";
+                sub += "[Aktiv] ";
             }
 
             if (lastMsg != null) {
@@ -53,7 +53,7 @@ class ChatsMenu extends WatchUi.Menu2 {
                 sub += "[" + unread + " neu] ";
             }
             if (isActive) {
-                sub += "✔ ";
+                sub += "[Aktiv] ";
             }
 
             if (lastMsg != null) {

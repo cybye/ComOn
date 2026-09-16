@@ -47,17 +47,17 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
         var tx = coords[0];
         var ty = coords[1];
 
-        // Bottom [💬 Antworten] button bounds: x: 100..350, y: 370..435
+        // Bottom [Antworten] button bounds: x: 100..350, y: 370..435
         if (tx >= 100 && tx <= 350 && ty >= 370 && ty <= 435) {
             KeyboardHelper.openKeyboard("");
             return true;
         }
 
         // Tap in upper/middle area: if tapped top half, scroll up; bottom half, scroll down
-        if (ty >= 60 && ty < 210) {
+        if (ty >= 20 && ty < 195) {
             _view.scrollUp();
             return true;
-        } else if (ty >= 210 && ty < 370) {
+        } else if (ty >= 195 && ty < 370) {
             _view.scrollDown();
             return true;
         }
