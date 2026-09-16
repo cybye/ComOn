@@ -47,10 +47,12 @@ class MeshNotificationManager {
             ] as Array<Notifications.Action>
         };
 
+        System.println("MeshNotificationManager: showNotification called for " + sender + " - " + text);
         try {
             Notifications.showNotification("Mesh: " + sender, "Eingehende Nachricht", options);
+            System.println("MeshNotificationManager: showNotification succeeded");
         } catch (e) {
-            System.println("showNotification error");
+            System.println("MeshNotificationManager: showNotification error: " + e.getErrorMessage());
             e.printStackTrace();
         }
     }

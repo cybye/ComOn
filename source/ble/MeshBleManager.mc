@@ -31,6 +31,7 @@ class MeshBleManager {
     private var _syncStage as Number = 0; // 0=Idle, 1=Inbox, 2=Time, 3=ContactsDelta, 4=Battery
     private var _syncedMessagesCount as Number = 0;
     private var _spoolQueue as Array<Dictionary> = [] as Array<Dictionary>;
+    private var _syncWatchdogTimer as Timer.Timer?;
 
     private var _device as BluetoothLowEnergy.Device?;
     private var _rxCharacteristic as BluetoothLowEnergy.Characteristic?;
@@ -142,6 +143,19 @@ class MeshBleManager {
         _syncedMessagesCount = 0;
         sendRaw(MeshProtocol.encodeSyncNextMessage());
         WatchUi.requestUpdate();
+
+        // Safety watchdog: max 3 seconds for session sync
+        if (_syncWatchdogTimer == null) {
+            _syncWatchdogTimer = new Timer.Timer();
+        }
+        _syncWatchdogTimer.start(method(:onSyncTimeout), 3000, false);
+    }
+
+    public function onSyncTimeout() as Void {
+        if (isSyncing) {
+            System.println("Sync watchdog: timeout reached, finalizing sync");
+            finishSessionSync();
+        }
     }
 
     private function setupCharacteristics(device as BluetoothLowEnergy.Device) as Void {
@@ -189,6 +203,8 @@ class MeshBleManager {
                 finishSessionSync();
             }
             return;
+        } else if (firstByte == MeshProtocol.RESP_CODE_CONTACTS_START) {
+            return;
         } else if (firstByte == MeshProtocol.RESP_CODE_CONTACT) {
             // Parse binary contact record
             parseBinaryContact(value);
@@ -230,8 +246,11 @@ class MeshBleManager {
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
         ChatHistoryManager.addMessage(tid, lastSender, mText, false);
 
+        System.println("BLE RX: sender=" + lastSender + " isSyncing=" + isSyncing + " mText=" + mText);
+
         // Only pop full screen notification if not in silent bulk sync
         if (!isSyncing) {
+            System.println("Triggering showIncomingMessage for " + lastSender);
             MeshNotificationManager.getInstance().showIncomingMessage(lastSender, mText, tid);
         }
 
@@ -269,6 +288,9 @@ class MeshBleManager {
     }
 
     private function finishSessionSync() as Void {
+        if (_syncWatchdogTimer != null) {
+            _syncWatchdogTimer.stop();
+        }
         isSyncing = false;
         _syncStage = 0;
         flushSpoolQueue();

@@ -19,8 +19,6 @@ class VirtualMeshNode {
     private var _contacts as Array<Dictionary> = [] as Array<Dictionary>;
     private var _notifyCallback as Method?;
     private var _echoTimer as Timer.Timer?;
-    private var _asyncTimer as Timer.Timer?;
-    private var _pendingNotifyData as Array<Number>?;
 
     public static function getInstance() as VirtualMeshNode {
         if (_instance == null) {
@@ -56,7 +54,7 @@ class VirtualMeshNode {
 
         if (cmd == MeshProtocol.CMD_APP_START) {
             // Handshake response: OK, protocol version 1.0
-            sendNotifyAsync([MeshProtocol.RESP_CODE_OK, 0x01, 0x00]);
+            deliverNotify([MeshProtocol.RESP_CODE_OK, 0x01, 0x00]);
         } else if (cmd == MeshProtocol.CMD_SEND_CHANNEL_TXT_MSG) {
             handleSendChannelMessage(bytes);
         } else if (cmd == MeshProtocol.CMD_SYNC_NEXT_MESSAGE) {
@@ -69,7 +67,7 @@ class VirtualMeshNode {
             handleGetBattery();
         } else {
             // Default OK
-            sendNotifyAsync([MeshProtocol.RESP_CODE_OK]);
+            deliverNotify([MeshProtocol.RESP_CODE_OK]);
         }
     }
 
@@ -89,7 +87,7 @@ class VirtualMeshNode {
         System.println("VirtualNode RX Channel " + channelIdx + ": " + text);
 
         // Respond with RESP_CODE_SENT
-        sendNotifyAsync([MeshProtocol.RESP_CODE_SENT, 0x00]);
+        deliverNotify([MeshProtocol.RESP_CODE_SENT, 0x00]);
 
         // If echo mode active, simulate remote response
         if (echoMode && text.length() > 0) {
@@ -112,13 +110,13 @@ class VirtualMeshNode {
 
             // Transmit as formatted incoming string over virtual NUS: "Sender: Text"
             var fullStr = sender + ": " + text;
-            sendNotifyAsync(fullStr.toUtf8Array());
+            deliverNotify(fullStr.toUtf8Array());
         } else {
             // Queue empty -> return RESP_CODE_OK
             var resp = [] as Array<Number>;
             resp.add(MeshProtocol.RESP_CODE_OK);
             resp.add(0);
-            sendNotifyAsync(resp);
+            deliverNotify(resp);
         }
     }
 
@@ -164,7 +162,7 @@ class VirtualMeshNode {
             nodeTime = bytes[1] | (bytes[2] << 8) | (bytes[3] << 16) | (bytes[4] << 24);
             System.println("VirtualNode: Clock synchronized to " + nodeTime);
         }
-        sendNotifyAsync([MeshProtocol.RESP_CODE_OK]);
+        deliverNotify([MeshProtocol.RESP_CODE_OK]);
     }
 
     private function handleGetBattery() as Void {
@@ -174,7 +172,7 @@ class VirtualMeshNode {
             ((batteryMv >> 8) & 0xFF),
             batteryPercent
         ] as Array<Number>;
-        sendNotifyAsync(payload);
+        deliverNotify(payload);
     }
 
     //! Inject an incoming message into the node's LoRa radio receiver
@@ -190,7 +188,7 @@ class VirtualMeshNode {
         if (isBleConnected) {
             // If watch is connected, push notification byte PUSH_CODE_MSG_WAITING or deliver message
             var fullStr = sender + ": " + text;
-            sendNotifyAsync(fullStr.toUtf8Array());
+            deliverNotify(fullStr.toUtf8Array());
         } else {
             System.println("VirtualNode: Buffered offline message from " + sender);
         }
@@ -211,7 +209,7 @@ class VirtualMeshNode {
             :snr => 8
         });
         if (isBleConnected) {
-            sendNotifyAsync([MeshProtocol.PUSH_CODE_MSG_WAITING]);
+            deliverNotify([MeshProtocol.PUSH_CODE_MSG_WAITING]);
         }
     }
 
@@ -230,19 +228,6 @@ class VirtualMeshNode {
     public function onEchoTimerTrigger() as Void {
         var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText) : "Empfang OK";
         injectMessage("Echo", replyText, 0);
-    }
-
-    private function sendNotifyAsync(data as Array<Number>) as Void {
-        _pendingNotifyData = data;
-        _asyncTimer = new Timer.Timer();
-        _asyncTimer.start(method(:onAsyncTimerTrigger), 50, false); // 50ms (ConnectIQ min timer)
-    }
-
-    public function onAsyncTimerTrigger() as Void {
-        if (_pendingNotifyData != null) {
-            deliverNotify(_pendingNotifyData as Array<Number>);
-            _pendingNotifyData = null;
-        }
     }
 
     private function deliverNotify(data as Array<Number>) as Void {
