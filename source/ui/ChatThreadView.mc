@@ -47,10 +47,10 @@ class ChatThreadView extends WatchUi.View {
         var fontTiny  = Graphics.FONT_SYSTEM_TINY;
         var fontH = dc.getFontHeight(fontXtiny);
 
-        // 1. Content Area (Full vertical space without top header)
+        // 1. Content Area
         var msgs = ChatHistoryManager.getMessagesForTarget(targetId);
-        var viewportTop = 20;
-        var viewportBottom = 370;
+        var viewportTop = 50;
+        var viewportBottom = 362;
         var viewportH = viewportBottom - viewportTop;
 
         if (msgs.size() == 0) {
@@ -61,7 +61,7 @@ class ChatThreadView extends WatchUi.View {
         }
 
         // 2. Compute Bubbles & Render
-        var maxBubbleW = 280;
+        var maxBubbleW = 290;
         var bubbleGap = 10;
         var totalContentH = 0;
         var bubbleLayouts = [] as Array<Dictionary>;
@@ -70,23 +70,32 @@ class ChatThreadView extends WatchUi.View {
             var m = msgs[i];
             var txt = m[:text] as String;
             var isOut = m[:isOutgoing] as Boolean;
-            var sender = m[:sender] as String;
+            var sender = isOut ? "Ich" : (m[:sender] as String);
             var timeStr = ChatHistoryManager.formatTimeAgo(m[:time] as Number);
 
-            var lines = wrapMessageText(dc, txt, fontXtiny, maxBubbleW - 20);
+            var lines = wrapMessageText(dc, txt, fontXtiny, maxBubbleW - 24);
             var lineH = fontH + 3;
             var bubbleTextH = lines.size() * lineH;
             // header (fontH + 6) + gap (4) + text + bottom padding (8)
             var bubbleH = fontH + 18 + bubbleTextH;
 
-            // Measure max line width for compact bubble
+            // Measure max line width of text
             var longestLine = 0;
             for (var l = 0; l < lines.size(); l++) {
                 var lw = dc.getTextWidthInPixels(lines[l], fontXtiny);
                 if (lw > longestLine) { longestLine = lw; }
             }
+
+            // Ensure bubble accommodates sender + gap + timestamp
+            var senderW = dc.getTextWidthInPixels(sender, fontXtiny);
+            var timeW = dc.getTextWidthInPixels(timeStr, fontXtiny);
+            var headerContentW = senderW + timeW + 20; // at least 20px space between name and time
+            if (headerContentW > longestLine) {
+                longestLine = headerContentW;
+            }
+
             var computedBubbleW = longestLine + 24;
-            if (computedBubbleW < 120) { computedBubbleW = 120; }
+            if (computedBubbleW < 130) { computedBubbleW = 130; }
             if (computedBubbleW > maxBubbleW) { computedBubbleW = maxBubbleW; }
 
             bubbleLayouts.add({
@@ -111,10 +120,8 @@ class ChatThreadView extends WatchUi.View {
         }
 
         // Draw Bubbles
-        // When scrollOffset = 0, we align the bottom of content to viewportBottom
-        var startY = (totalContentH > viewportH) ? 
-            (viewportBottom - totalContentH + _scrollOffset) : 
-            viewportTop;
+        // Always bottom-align content towards viewportBottom (just above the button)
+        var startY = viewportBottom - totalContentH + _scrollOffset;
 
         var curY = startY;
         for (var b = 0; b < bubbleLayouts.size(); b++) {
@@ -128,7 +135,19 @@ class ChatThreadView extends WatchUi.View {
 
             // Only draw if within visible viewport
             if ((curY + bh) >= viewportTop && curY <= viewportBottom) {
-                var bx = isOut ? (w - 36 - bw) : 36;
+                var bx = isOut ? (w - 32 - bw) : 32;
+
+                // Safety space check: truncate sender if name + time is too wide
+                var availHeaderW = bw - 20;
+                var timeW = dc.getTextWidthInPixels(timeStr, fontXtiny);
+                var maxSenderW = availHeaderW - timeW - 14;
+                var displaySender = sender;
+                if (dc.getTextWidthInPixels(displaySender, fontXtiny) > maxSenderW) {
+                    while (displaySender.length() > 2 && dc.getTextWidthInPixels(displaySender + "..", fontXtiny) > maxSenderW) {
+                        displaySender = displaySender.substring(0, displaySender.length() - 1);
+                    }
+                    displaySender = displaySender + "..";
+                }
 
                 // Bubble Card Fill & Border
                 if (isOut) {
@@ -139,7 +158,7 @@ class ChatThreadView extends WatchUi.View {
 
                     // Header: "Ich" + time
                     dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-                    dc.drawText(bx + 10, curY + 6, fontXtiny, "Ich", Graphics.TEXT_JUSTIFY_LEFT);
+                    dc.drawText(bx + 10, curY + 6, fontXtiny, displaySender, Graphics.TEXT_JUSTIFY_LEFT);
                     dc.setColor(0x6688aa, Graphics.COLOR_TRANSPARENT);
                     dc.drawText(bx + bw - 10, curY + 6, fontXtiny, timeStr, Graphics.TEXT_JUSTIFY_RIGHT);
                 } else {
@@ -150,7 +169,7 @@ class ChatThreadView extends WatchUi.View {
 
                     // Header: Sender name in Orange + time
                     dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT);
-                    dc.drawText(bx + 10, curY + 6, fontXtiny, sender, Graphics.TEXT_JUSTIFY_LEFT);
+                    dc.drawText(bx + 10, curY + 6, fontXtiny, displaySender, Graphics.TEXT_JUSTIFY_LEFT);
                     dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
                     dc.drawText(bx + bw - 10, curY + 6, fontXtiny, timeStr, Graphics.TEXT_JUSTIFY_RIGHT);
                 }
@@ -166,21 +185,21 @@ class ChatThreadView extends WatchUi.View {
             curY += bh + bubbleGap;
         }
 
-        // Scroll Indicators (clean vector triangles instead of unicode characters)
+        // Scroll Indicators (positioned outside viewport so they never overlap bubbles)
         if (_scrollOffset < _maxScroll) {
             dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-            dc.fillPolygon([[cx - 6, 14], [cx + 6, 14], [cx, 7]]);
+            dc.fillPolygon([[cx - 7, 43], [cx + 7, 43], [cx, 35]]);
         }
         if (_scrollOffset > 0) {
             dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-            dc.fillPolygon([[cx - 6, 362], [cx + 6, 362], [cx, 369]]);
+            dc.fillPolygon([[cx - 7, 365], [cx + 7, 365], [cx, 373]]);
         }
 
         // 3. Bottom Quick Action Button: [ Antworten ]
         var btnW = 210;
         var btnH = 44;
         var btnX = cx - (btnW / 2);
-        var btnY = 380;
+        var btnY = 376;
 
         dc.setColor(0x155724, Graphics.COLOR_TRANSPARENT); // Forest Green
         dc.fillRoundedRectangle(btnX, btnY, btnW, btnH, 10);
@@ -188,7 +207,7 @@ class ChatThreadView extends WatchUi.View {
         dc.drawRoundedRectangle(btnX, btnY, btnW, btnH, 10);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, btnY + 11, fontXtiny, "Antworten", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, btnY + (btnH / 2) - 2, fontXtiny, "Antworten", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function wrapMessageText(dc as Graphics.Dc, text as String, font as Graphics.FontDefinition, maxWidth as Number) as Array<String> {
