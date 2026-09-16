@@ -66,7 +66,10 @@ class DashboardView extends WatchUi.View {
         // 1. Top Header: Status
         var statusColor = Graphics.COLOR_RED;
         var statusText = "Getrennt";
-        if (bleMgr.isConnected) {
+        if (bleMgr.isSyncing) {
+            statusColor = 0x00d4ff; // Cyan
+            statusText = "Sync mit Node...";
+        } else if (bleMgr.isConnected) {
             statusColor = Graphics.COLOR_GREEN;
             statusText = bleMgr.deviceName;
         } else if (bleMgr.isScanning) {

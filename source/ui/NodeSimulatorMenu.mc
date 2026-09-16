@@ -6,16 +6,19 @@ class NodeSimulatorMenu extends WatchUi.Menu2 {
         Menu2.initialize({ :title => "Node-Simulator" });
 
         var bleMgr = getBleManager();
+        var vNode = bleMgr.virtualNode;
         var connSub = bleMgr.isConnected ? "Aktiv (" + bleMgr.deviceName + ")" : "Getrennt";
-        var echoSub = bleMgr.echoModeEnabled ? "Status: AN" : "Status: AUS";
+        var echoSub = vNode.echoMode ? "Status: AN" : "Status: AUS";
+        var bufCount = vNode.getPendingInboxCount();
+        var bufSub = bufCount.toString() + " Nachricht(en) im Puffer";
 
-        addItem(new WatchUi.MenuItem("Kurze Nachricht", "Team Alpha: Wo seid ihr?", "SIM_MSG", null));
-        addItem(new WatchUi.MenuItem("Lange Nachricht (Max)", "Grat 2450m, steigen ab...", "SIM_LONG_MSG", null));
+        addItem(new WatchUi.MenuItem("Virtuelle Node BLE", connSub, "SIM_CONN", null));
+        addItem(new WatchUi.MenuItem("3 Offline-Nachrichten puffern", bufSub, "SIM_BUFFER", null));
+        addItem(new WatchUi.MenuItem("Funkspruch einspeisen", "Florian: Wegpunkt 3...", "SIM_MSG", null));
         addItem(new WatchUi.MenuItem("SOS Notruf einspeisen", "Notfall Broadcast", "SIM_SOS", null));
-        addItem(new WatchUi.MenuItem("Neue Kontakte lernen", "OTA Discovery (+3)", "SIM_DISCOVER", null));
-        addItem(new WatchUi.MenuItem("Echo / Loopback", echoSub, "SIM_ECHO", null));
+        addItem(new WatchUi.MenuItem("Neuer Kontakt (Delta)", "Bergwacht Team 2", "SIM_DISCOVER", null));
+        addItem(new WatchUi.MenuItem("Echo / Auto-Reply", echoSub, "SIM_ECHO", null));
         addItem(new WatchUi.MenuItem("Signal durchschalten", bleMgr.getSignalStatusString(), "SIM_SIGNAL", null));
-        addItem(new WatchUi.MenuItem("Verbindung umschalten", connSub, "SIM_CONN", null));
     }
 }
 
@@ -27,43 +30,42 @@ class NodeSimulatorDelegate extends WatchUi.Menu2InputDelegate {
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
         var bleMgr = getBleManager();
+        var vNode = bleMgr.virtualNode;
 
-        if (id.equals("SIM_MSG")) {
-            bleMgr.simulateIncomingMessage("Florian", "Team Alpha: Wo seid ihr?");
+        if (id.equals("SIM_CONN")) {
+            if (bleMgr.isConnected) {
+                bleMgr.simulateDisconnect();
+                item.setSubLabel("Getrennt");
+                WatchUi.showToast("Virtuelle Node getrennt", null);
+            } else {
+                bleMgr.simulateConnect("Virtual-Node");
+                item.setSubLabel("Aktiv (Virtual-Node)");
+                WatchUi.showToast("Verbunden: Virtual-Node", null);
+            }
+        } else if (id.equals("SIM_BUFFER")) {
+            vNode.fillInboxWithMissedMessages();
+            item.setSubLabel(vNode.getPendingInboxCount().toString() + " Nachricht(en) im Puffer");
+            WatchUi.showToast("3 Nachrichten gepuffert!", null);
+        } else if (id.equals("SIM_MSG")) {
+            vNode.injectMessage("Florian", "Bin 200m hinter dir am Steig.", 0);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast("Nachricht empfangen!", null);
-        } else if (id.equals("SIM_LONG_MSG")) {
-            bleMgr.simulateIncomingMessage("Florian", "Team Alpha: Wir sind am Grat auf 2.450m. Sicht wird schlechter, steigen jetzt zur Biwakschachtel ab. Bitte um Bestaetigung!");
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast("Lange Nachricht empfangen!", null);
+            WatchUi.showToast("Funkspruch gesendet", null);
         } else if (id.equals("SIM_SOS")) {
-            bleMgr.simulateIncomingMessage("SOS Florian", "Notfall 47.4925N 11.0955E");
+            vNode.injectMessage("SOS Florian", "Notfall! 47.4925N 11.0955E", 1);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast("Notruf empfangen!", null);
+            WatchUi.showToast("Notruf eingespeist!", null);
         } else if (id.equals("SIM_DISCOVER")) {
-            ContactManager.addChannel(3, "Kanal: Bergwacht");
-            ContactManager.addContact("NODE_FLORIAN", "Florian (Node-4A)");
-            ContactManager.addContact("NODE_BASECAMP", "HQ Basecamp (Node-01)");
+            vNode.injectContact("Bergwacht Team 2", "NODE_BW2");
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast("+3 Ziele hinzugefuegt", null);
+            WatchUi.showToast("Neuer Kontakt aktiv", null);
         } else if (id.equals("SIM_ECHO")) {
-            bleMgr.echoModeEnabled = !bleMgr.echoModeEnabled;
-            item.setSubLabel(bleMgr.echoModeEnabled ? "Status: AN" : "Status: AUS");
-            WatchUi.showToast(bleMgr.echoModeEnabled ? "Echo: AN (Antwort nach 1.2s)" : "Echo: AUS", null);
+            vNode.echoMode = !vNode.echoMode;
+            item.setSubLabel(vNode.echoMode ? "Status: AN" : "Status: AUS");
+            WatchUi.showToast(vNode.echoMode ? "Echo: AN (Antwort nach 1.5s)" : "Echo: AUS", null);
         } else if (id.equals("SIM_SIGNAL")) {
             bleMgr.cycleSimulatedSignal();
             item.setSubLabel(bleMgr.getSignalStatusString());
             WatchUi.showToast("Signal: " + bleMgr.getSignalStatusString(), null);
-        } else if (id.equals("SIM_CONN")) {
-            if (bleMgr.isConnected) {
-                bleMgr.simulateDisconnect();
-                item.setSubLabel("Getrennt");
-                WatchUi.showToast("Node getrennt", null);
-            } else {
-                bleMgr.simulateConnect("MeshCore-Sim");
-                item.setSubLabel("Aktiv (MeshCore-Sim)");
-                WatchUi.showToast("Verbunden: MeshCore-Sim", null);
-            }
         }
     }
 

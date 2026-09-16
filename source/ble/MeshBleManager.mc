@@ -14,18 +14,23 @@ class MeshBleManager {
     public var isConnected as Boolean = false;
     public var isScanning as Boolean = false;
     public var isSimulated as Boolean = false;
+    public var isSyncing as Boolean = false;
     public var deviceName as String = "MeshCore";
     public var lastReceivedMessage as String = "Bereit zum Empfang";
     public var lastSender as String = "Mesh";
+
+    // Virtual Node Twin
+    public var virtualNode as VirtualMeshNode;
 
     // Signal & Network Quality Metrics
     public var loraRssi as Number? = -84; // in dBm
     public var loraSnr as Number? = 6;    // in dB
     public var peerCount as Number = 3;   // Active nodes in mesh
 
-    public var echoModeEnabled as Boolean = false;
-    private var _echoTimer as Timer.Timer?;
-    private var _pendingEchoText as String = "";
+    // Staged Sync State Machine & Spool Queue
+    private var _syncStage as Number = 0; // 0=Idle, 1=Inbox, 2=Time, 3=ContactsDelta, 4=Battery
+    private var _syncedMessagesCount as Number = 0;
+    private var _spoolQueue as Array<Dictionary> = [] as Array<Dictionary>;
 
     private var _device as BluetoothLowEnergy.Device?;
     private var _rxCharacteristic as BluetoothLowEnergy.Characteristic?;
@@ -36,9 +41,16 @@ class MeshBleManager {
     }
 
     function initialize() {
+        virtualNode    = VirtualMeshNode.getInstance();
         nusServiceUuid = BluetoothLowEnergy.stringToUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
         nusRxUuid      = BluetoothLowEnergy.stringToUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
         nusTxUuid      = BluetoothLowEnergy.stringToUuid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
+
+        virtualNode.setNotifyCallback(method(:onVirtualNotify));
+    }
+
+    public function onVirtualNotify(bytes as Array<Number>) as Void {
+        procCharacteristicChanged(null, bytes as ByteArray);
     }
 
     public function registerProfile() as Void {
@@ -62,6 +74,9 @@ class MeshBleManager {
     }
 
     public function startScan() as Void {
+        if (isSimulated) {
+            return;
+        }
         if (!isScanning && !isConnected) {
             isScanning = true;
             BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
@@ -103,16 +118,30 @@ class MeshBleManager {
                 loraSnr = 6;
                 peerCount = ContactManager.getContacts().size();
             }
+            startSessionSync();
         } else {
             isConnected = false;
+            isSyncing = false;
+            _syncStage = 0;
             _device = null;
             _rxCharacteristic = null;
             _txCharacteristic = null;
             loraRssi = null;
             loraSnr = null;
             peerCount = 0;
-            startScan();
+            if (!isSimulated) {
+                startScan();
+            }
         }
+    }
+
+    //! Start the staged session sync (Inbox-First, Time, Delta-Contacts, Battery)
+    public function startSessionSync() as Void {
+        isSyncing = true;
+        _syncStage = 1; // Stage 1: Inbox First!
+        _syncedMessagesCount = 0;
+        sendRaw(MeshProtocol.encodeSyncNextMessage());
+        WatchUi.requestUpdate();
     }
 
     private function setupCharacteristics(device as BluetoothLowEnergy.Device) as Void {
@@ -133,41 +162,154 @@ class MeshBleManager {
         }
     }
 
-    public function procCharacteristicChanged(characteristic as BluetoothLowEnergy.Characteristic, value as ByteArray) as Void {
-        if (value != null && value.size() > 0) {
-            var arr = [] as Array<Number>;
-            for (var i = 0; i < value.size(); i++) {
-                arr.add(value[i]);
+    public function procCharacteristicChanged(characteristic as BluetoothLowEnergy.Characteristic?, value as ByteArray) as Void {
+        if (value == null || value.size() == 0) {
+            return;
+        }
+
+        var firstByte = value[0] as Number;
+
+        // 1. Binary Response Codes
+        if (firstByte == MeshProtocol.RESP_CODE_OK) {
+            if (_syncStage == 1) {
+                // Inbox is now drained -> proceed to Stage 2: Time Sync
+                _syncStage = 2;
+                sendRaw(MeshProtocol.encodeSetDeviceTime(Time.now().value()));
+            } else if (_syncStage == 2) {
+                // Time sync acknowledged -> proceed to Stage 3: Contacts Delta Sync
+                _syncStage = 3;
+                sendRaw(MeshProtocol.encodeGetContactsSince(ContactManager.getLastContactSyncTime()));
+            } else if (_syncStage == 4) {
+                // Battery & stats response
+                if (value.size() >= 4) {
+                    var batMv = value[1] | (value[2] << 8);
+                    System.println("Node battery: " + batMv + " mV");
+                }
+                // Sync completed!
+                finishSessionSync();
             }
-            var msgText = StringUtil.utf8ArrayToString(arr);
-            lastReceivedMessage = msgText;
-            lastSender = "Mesh";
+            return;
+        } else if (firstByte == MeshProtocol.RESP_CODE_CONTACT) {
+            // Parse binary contact record
+            parseBinaryContact(value);
+            return;
+        } else if (firstByte == MeshProtocol.RESP_CODE_END_OF_CONTACTS) {
+            // Contact delta sync complete -> proceed to Stage 4: Battery & Storage
+            ContactManager.setLastContactSyncTime(Time.now().value());
+            _syncStage = 4;
+            sendRaw(MeshProtocol.encodeGetBattery());
+            return;
+        } else if (firstByte == MeshProtocol.RESP_CODE_SENT) {
+            return;
+        } else if (firstByte == MeshProtocol.PUSH_CODE_MSG_WAITING) {
+            // Radio signaled incoming message waiting in buffer -> pull it
+            sendRaw(MeshProtocol.encodeSyncNextMessage());
+            return;
+        }
 
-            // Save to Chat History
-            var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
-            ChatHistoryManager.addMessage(tid, lastSender, msgText, false);
+        // 2. Incoming Text Message (UTF-8)
+        var arr = [] as Array<Number>;
+        for (var i = 0; i < value.size(); i++) {
+            arr.add(value[i]);
+        }
+        var rawText = StringUtil.utf8ArrayToString(arr);
 
-            // Show interactive notification via Toybox.Notifications
-            MeshNotificationManager.getInstance().showIncomingMessage(lastSender, msgText, tid);
+        // Parse "Sender: MessageText"
+        var s = "Mesh";
+        var mText = rawText;
+        var colonIdx = rawText.find(": ");
+        if (colonIdx != null && colonIdx > 0) {
+            s = rawText.substring(0, colonIdx);
+            mText = rawText.substring(colonIdx + 2, rawText.length());
+        }
+
+        lastReceivedMessage = mText;
+        lastSender = s;
+
+        // Save to Chat History
+        var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
+        ChatHistoryManager.addMessage(tid, lastSender, mText, false);
+
+        // Only pop full screen notification if not in silent bulk sync
+        if (!isSyncing) {
+            MeshNotificationManager.getInstance().showIncomingMessage(lastSender, mText, tid);
+        }
+
+        if (isSyncing && _syncStage == 1) {
+            _syncedMessagesCount++;
+            // Fetch next message in inbox queue
+            sendRaw(MeshProtocol.encodeSyncNextMessage());
+        }
+
+        WatchUi.requestUpdate();
+    }
+
+    private function parseBinaryContact(value as ByteArray) as Void {
+        try {
+            if (value.size() >= 4) {
+                var idLen = value[1] as Number;
+                if (value.size() >= 2 + idLen + 1) {
+                    var idBytes = [] as Array<Number>;
+                    for (var i = 2; i < 2 + idLen; i++) { idBytes.add(value[i]); }
+                    var idStr = StringUtil.utf8ArrayToString(idBytes);
+
+                    var nameLenIdx = 2 + idLen;
+                    var nameLen = value[nameLenIdx] as Number;
+                    if (value.size() >= nameLenIdx + 1 + nameLen) {
+                        var nameBytes = [] as Array<Number>;
+                        for (var j = nameLenIdx + 1; j < nameLenIdx + 1 + nameLen; j++) { nameBytes.add(value[j]); }
+                        var nameStr = StringUtil.utf8ArrayToString(nameBytes);
+                        ContactManager.addContact(idStr, nameStr);
+                    }
+                }
+            }
+        } catch (e) {
+            System.println("parseBinaryContact notice");
+        }
+    }
+
+    private function finishSessionSync() as Void {
+        isSyncing = false;
+        _syncStage = 0;
+        flushSpoolQueue();
+        if (_syncedMessagesCount > 0) {
+            WatchUi.showToast("[" + _syncedMessagesCount + " Nachrichten empfangen]", null);
+        }
+        WatchUi.requestUpdate();
+    }
+
+    public function flushSpoolQueue() as Void {
+        if (_spoolQueue.size() > 0 && isConnected) {
+            var sentCount = _spoolQueue.size();
+            for (var i = 0; i < _spoolQueue.size(); i++) {
+                var item = _spoolQueue[i];
+                var ch = item[:ch] as Number;
+                var txt = item[:text] as String;
+                var payload = MeshProtocol.encodeChannelMessage(ch, txt);
+                sendRaw(payload);
+            }
+            _spoolQueue = [] as Array<Dictionary>;
+            WatchUi.showToast(sentCount.toString() + " wartende Nachricht(en) gesendet", null);
         }
     }
 
     public function procCharacteristicWrite(characteristic as BluetoothLowEnergy.Characteristic, status as BluetoothLowEnergy.Status) as Void {
-        // Callback on write complete
     }
 
     public function procDescriptorWrite(descriptor as BluetoothLowEnergy.Descriptor, status as BluetoothLowEnergy.Status) as Void {
-        // Callback on CCCD write complete
     }
 
     public function sendRaw(bytes as ByteArray) as Boolean {
+        if (isSimulated) {
+            virtualNode.onRxData(bytes);
+            return true;
+        }
         if (isConnected && _rxCharacteristic != null) {
             try {
                 _rxCharacteristic.requestWrite(bytes, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
                 return true;
             } catch (e) {
                 System.println("BLE write error");
-                e.printStackTrace();
             }
         }
         return false;
@@ -175,14 +317,19 @@ class MeshBleManager {
 
     public function sendChannelText(channelIdx as Number, text as String) as Boolean {
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + channelIdx);
-        ChatHistoryManager.addMessage(tid, "Ich", text, true);
 
-        var payload = MeshProtocol.encodeChannelMessage(channelIdx, text);
-        var res = sendRaw(payload);
-        if (echoModeEnabled || isSimulated) {
-            triggerEchoReply(text);
+        // Store & Forward: If disconnected, queue message instead of dropping it
+        if (!isConnected) {
+            _spoolQueue.add({ :ch => channelIdx, :text => text, :tid => tid });
+            ChatHistoryManager.addMessage(tid, "Ich", text + " [Wartet auf Node]", true);
+            WatchUi.showToast("In Warteschlange: Sendet bei Verbindung", null);
+            startScan();
             return true;
         }
+
+        ChatHistoryManager.addMessage(tid, "Ich", text, true);
+        var payload = MeshProtocol.encodeChannelMessage(channelIdx, text);
+        var res = sendRaw(payload);
         return res;
     }
 
@@ -199,22 +346,27 @@ class MeshBleManager {
     }
 
     // -----------------------------------------------------------------
-    // SIMULATION & TEST BENCH METHODS
+    // VIRTUAL MESHCORE NODE SIMULATION METHODS
     // -----------------------------------------------------------------
     public function simulateConnect(simDeviceName as String) as Void {
         isSimulated = true;
         isConnected = true;
         isScanning = false;
         deviceName = simDeviceName;
-        loraRssi = -84;
-        loraSnr = 6;
-        peerCount = 3;
+        virtualNode.isBleConnected = true;
+        loraRssi = virtualNode.loraRssi;
+        loraSnr = virtualNode.loraSnr;
+        peerCount = ContactManager.getContacts().size();
         WatchUi.requestUpdate();
+
+        // Start real binary session sync with virtual node
+        startSessionSync();
     }
 
     public function simulateDisconnect() as Void {
-        isSimulated = false;
         isConnected = false;
+        isSyncing = false;
+        virtualNode.isBleConnected = false;
         deviceName = "MeshCore";
         loraRssi = null;
         loraSnr = null;
@@ -224,7 +376,7 @@ class MeshBleManager {
 
     public function cycleSimulatedSignal() as Void {
         if (!isConnected) {
-            simulateConnect("MeshCore-Sim");
+            simulateConnect("Virtual-Node");
             return;
         }
         if (loraRssi == null || loraRssi < -110) {
@@ -251,26 +403,8 @@ class MeshBleManager {
         return loraRssi.toString() + " dBm (SNR " + snrStr + ")";
     }
 
+    //! Inject an incoming message into the virtual node
     public function simulateIncomingMessage(sender as String, message as String) as Void {
-        lastReceivedMessage = message;
-        lastSender = sender;
-
-        var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
-        ChatHistoryManager.addMessage(tid, sender, message, false);
-
-        MeshNotificationManager.getInstance().showIncomingMessage(sender, message, tid);
-        WatchUi.requestUpdate();
-    }
-
-    public function triggerEchoReply(text as String) as Void {
-        _pendingEchoText = text;
-        if (_echoTimer == null) {
-            _echoTimer = new Timer.Timer();
-        }
-        _echoTimer.start(method(:onEchoTimerExpired), 1200, false);
-    }
-
-    public function onEchoTimerExpired() as Void {
-        simulateIncomingMessage("Node (Echo)", "ACK: " + _pendingEchoText);
+        virtualNode.injectMessage(sender, message, 0);
     }
 }
