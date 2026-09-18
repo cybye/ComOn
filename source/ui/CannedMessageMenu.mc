@@ -46,6 +46,7 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
+        System.println("CannedMessageDelegate: onSelect " + id + " (" + item.getLabel() + ")");
         var bleMgr = getBleManager();
         var chIdx = ContactManager.selectedChannelIdx;
 
@@ -70,6 +71,7 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onBack() as Void {
+        System.println("CannedMessageDelegate: onBack");
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }

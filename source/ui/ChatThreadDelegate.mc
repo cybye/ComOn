@@ -12,7 +12,9 @@ class ChatThreadDelegate extends WatchUi.InputDelegate {
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
+        System.println("ChatThreadDelegate: onKey key=" + key);
         if (key == WatchUi.KEY_ESC) {
+            System.println("ChatThreadDelegate: ESC pressed -> popView");
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return true;
         } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {

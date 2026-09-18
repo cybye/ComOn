@@ -58,6 +58,7 @@
     <string id="ToastSent">$1$ gesendet</string>
     <string id="ToastPositionSent">Position gesendet</string>
     <string id="ToastNotConnected">Nicht verbunden</string>
+    <string id="ToastPressBackAgainToExit">Nochmals ZURÜCK zum Beenden</string>
     <string id="ToastPosition">Position</string>
 
     <!-- Message Actions (Tapping Card) -->

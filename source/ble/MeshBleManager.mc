@@ -175,9 +175,9 @@ class MeshBleManager {
                             // If already paired, retrieve device from getPairedDevices
                             var pairedIter = BluetoothLowEnergy.getPairedDevices();
                             if (pairedIter != null) {
-                                for (var p = pairedIter.next(); p != null; p = pairedIter.next()) {
+                                var p = pairedIter.next();
+                                if (p != null) {
                                     _device = p as BluetoothLowEnergy.Device;
-                                    break;
                                 }
                             }
                             if (_device != null) {

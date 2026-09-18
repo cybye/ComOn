@@ -29,6 +29,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
         } else {
             // On Chat page: START opens active chat thread directly!
+            System.println("DashboardDelegate: START pressed on Chat page -> openActiveChatThread");
             openActiveChatThread();
         }
         return true;
@@ -36,6 +37,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
 
     //! 4 O'CLOCK BUTTON (BACK / LAP)
     function onBack() as Boolean {
+        System.println("DashboardDelegate: onBack called (pageIndex=" + _view.pageIndex + ")");
         if (_view.pageIndex == 2) {
             // On SOS page: Return to Telemetry
             _view.pageIndex = 1;
@@ -47,12 +49,21 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             WatchUi.requestUpdate();
             return true;
         }
-        // On Chat page: Standard Garmin exit
-        return false;
+        // On Chat page: Require double-tap of BACK within 2.5 seconds to exit
+        var now = System.getTimer();
+        if ((now - _lastBackTime) < 2500) {
+            System.println("DashboardDelegate: BACK confirmed -> Exiting app");
+            return false;
+        }
+        _lastBackTime = now;
+        System.println("DashboardDelegate: BACK pressed once -> showing toast prompt");
+        WatchUi.showToast(I18n.get(Rez.Strings.ToastPressBackAgainToExit), null);
+        return true;
     }
 
     //! 7 O'CLOCK BUTTON (DOWN) / Swipe Up -> Go to Data / SOS page
     function onNextPage() as Boolean {
+        System.println("DashboardDelegate: onNextPage (pageIndex=" + _view.pageIndex + ")");
         if (_view.pageIndex == 0) {
             _view.pageIndex = 1;
             WatchUi.requestUpdate();
@@ -67,6 +78,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
 
     //! 9 O'CLOCK BUTTON (UP) / Swipe Down -> Go to previous page
     function onPreviousPage() as Boolean {
+        System.println("DashboardDelegate: onPreviousPage (pageIndex=" + _view.pageIndex + ")");
         if (_view.pageIndex == 2) {
             _view.pageIndex = 1;
             WatchUi.requestUpdate();
@@ -81,6 +93,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
 
     //! MENU BUTTON
     function onMenu() as Boolean {
+        System.println("DashboardDelegate: onMenu called");
         openMainMenu();
         return true;
     }
@@ -88,6 +101,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
     //! Explicit key handler
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
+        System.println("DashboardDelegate: onKey key=" + key);
         if (key == WatchUi.KEY_DOWN) {
             return onNextPage();
         } else if (key == WatchUi.KEY_UP) {
@@ -96,33 +110,50 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             return onSelect();
         } else if (key == WatchUi.KEY_MENU) {
             return onMenu();
+        } else if (key == WatchUi.KEY_ESC) {
+            return onBack();
         }
         return false;
     }
 
     //! Touchscreen Tap handler
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
-        if (_view.pageIndex == 0) {
-            var coords = clickEvent.getCoordinates();
-            var tx = coords[0];
-            var ty = coords[1];
+        var coords = clickEvent.getCoordinates();
+        var tx = coords[0];
+        var ty = coords[1];
+        System.println("DashboardDelegate: onTap [" + tx + ", " + ty + "] on pageIndex=" + _view.pageIndex);
 
+        // Global hotzone: 9 o'clock touch (left bezel edge) -> Open Main Menu
+        if (tx <= 85 && ty >= 170 && ty <= 285) {
+            System.println("DashboardDelegate: 9 o'clock edge tapped -> opening Main Menu");
+            openMainMenu();
+            return true;
+        }
+
+        // Global hotzone: 2 o'clock touch (accent arc area) -> Triggers 2 o'clock action
+        if (tx >= 335 && ty >= 55 && ty <= 175) {
+            System.println("DashboardDelegate: 2 o'clock accent arc tapped -> triggering onSelect");
+            return onSelect();
+        }
+
+        if (_view.pageIndex == 0) {
             // 1. Target Badge tap at top (e.g. [#public] / [Florian]) -> Open Chats Menu
-            if (ty >= 45 && ty <= 100 && tx >= 100 && tx <= 354) {
+            if (ty >= 40 && ty <= 110 && tx >= 90 && tx <= 365) {
+                System.println("DashboardDelegate: Target badge tapped -> opening ChatsMenu");
                 WatchUi.pushView(new ChatsMenu(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
                 return true;
             }
 
             // 2. Message card bounds: x: 35..420, y: 125..355 -> Open Chat Thread directly
             if (tx >= 35 && tx <= 420 && ty >= 125 && ty <= 355) {
+                System.println("DashboardDelegate: Message card tapped -> opening ChatThread");
                 openActiveChatThread();
                 return true;
             }
         } else if (_view.pageIndex == 2) {
-            var coords = clickEvent.getCoordinates();
-            var ty = coords[1];
             // SOS Card & Prompt bounds: ty = 100..410 -> Launch SOS
             if (ty >= 100 && ty <= 410) {
+                System.println("DashboardDelegate: SOS prompt tapped -> launching SOS");
                 var sos = new SosView();
                 WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
                 return true;
