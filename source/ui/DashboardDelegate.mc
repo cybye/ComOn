@@ -11,21 +11,37 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         _view = view;
     }
 
+    public function openActiveChatThread() as Void {
+        var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
+        var label = ContactManager.getTargetDisplayName();
+        var view = new ChatThreadView(tid, label);
+        WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
+    }
+
     //! 2 O'CLOCK BUTTON (START / SELECT)
     function onSelect() as Boolean {
         if (_view.pageIndex == 1) {
             // On Telemetry page: START sends position directly!
             sendPositionDirect();
+        } else if (_view.pageIndex == 2) {
+            // On SOS page: START launches SOS emergency view!
+            var sos = new SosView();
+            WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
         } else {
-            // On Chat page: START opens main menu
-            openMainMenu();
+            // On Chat page: START opens active chat thread directly!
+            openActiveChatThread();
         }
         return true;
     }
 
     //! 4 O'CLOCK BUTTON (BACK / LAP)
     function onBack() as Boolean {
-        if (_view.pageIndex == 1) {
+        if (_view.pageIndex == 2) {
+            // On SOS page: Return to Telemetry
+            _view.pageIndex = 1;
+            WatchUi.requestUpdate();
+            return true;
+        } else if (_view.pageIndex == 1) {
             // On Telemetry page: Return to Chat
             _view.pageIndex = 0;
             WatchUi.requestUpdate();
@@ -35,19 +51,27 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    //! 7 O'CLOCK BUTTON (DOWN) / Swipe Up -> Go to Data page
+    //! 7 O'CLOCK BUTTON (DOWN) / Swipe Up -> Go to Data / SOS page
     function onNextPage() as Boolean {
         if (_view.pageIndex == 0) {
             _view.pageIndex = 1;
+            WatchUi.requestUpdate();
+            return true;
+        } else if (_view.pageIndex == 1) {
+            _view.pageIndex = 2;
             WatchUi.requestUpdate();
             return true;
         }
         return false;
     }
 
-    //! 9 O'CLOCK BUTTON (UP) / Swipe Down -> Go to Chat page
+    //! 9 O'CLOCK BUTTON (UP) / Swipe Down -> Go to previous page
     function onPreviousPage() as Boolean {
-        if (_view.pageIndex == 1) {
+        if (_view.pageIndex == 2) {
+            _view.pageIndex = 1;
+            WatchUi.requestUpdate();
+            return true;
+        } else if (_view.pageIndex == 1) {
             _view.pageIndex = 0;
             WatchUi.requestUpdate();
             return true;
@@ -76,16 +100,54 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    //! Touchscreen Tap handler: Tap on message card opens reply actions
+    //! Touchscreen Tap handler
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
         if (_view.pageIndex == 0) {
             var coords = clickEvent.getCoordinates();
             var tx = coords[0];
             var ty = coords[1];
-            // Message card bounds: x: 35..420, y: 125..355
+
+            // 1. Target Badge tap at top (e.g. [#public] / [Florian]) -> Open Chats Menu
+            if (ty >= 45 && ty <= 100 && tx >= 100 && tx <= 354) {
+                WatchUi.pushView(new ChatsMenu(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
+                return true;
+            }
+
+            // 2. Message card bounds: x: 35..420, y: 125..355 -> Open Chat Thread directly
             if (tx >= 35 && tx <= 420 && ty >= 125 && ty <= 355) {
-                var sender = getBleManager().lastSender;
-                WatchUi.pushView(new MessageActionMenu(sender), new MessageActionDelegate(sender), WatchUi.SLIDE_LEFT);
+                openActiveChatThread();
+                return true;
+            }
+        } else if (_view.pageIndex == 2) {
+            var coords = clickEvent.getCoordinates();
+            var ty = coords[1];
+            // SOS Card bounds: ty = 100..310 -> Launch SOS
+            if (ty >= 100 && ty <= 310) {
+                var sos = new SosView();
+                WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //! Touchscreen Swipe handler
+    function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
+        if (_view.pageIndex == 0) {
+            if (swipeEvent.getDirection() == WatchUi.SWIPE_LEFT) {
+                openActiveChatThread();
+                return true;
+            }
+        } else if (_view.pageIndex == 1) {
+            if (swipeEvent.getDirection() == WatchUi.SWIPE_RIGHT) {
+                _view.pageIndex = 0;
+                WatchUi.requestUpdate();
+                return true;
+            }
+        } else if (_view.pageIndex == 2) {
+            if (swipeEvent.getDirection() == WatchUi.SWIPE_RIGHT) {
+                _view.pageIndex = 1;
+                WatchUi.requestUpdate();
                 return true;
             }
         }
@@ -108,17 +170,13 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         var targetLabel = I18n.format(Rez.Strings.MenuActiveTarget, [ ContactManager.getTargetDisplayName() ]);
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuChats), targetLabel, "MENU_CHATS", null));
 
-        // 2. Send message & position
-        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendMsg), I18n.get(Rez.Strings.MenuSendMsgSub), "MENU_MSG", null));
-        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendPosition), I18n.get(Rez.Strings.MenuSendPositionSub), "MENU_POS", null));
-
-        // 3. SOS Emergency
+        // 2. SOS Emergency
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSos), I18n.get(Rez.Strings.MenuSosSub), "MENU_SOS", null));
 
-        // 4. Settings Submenu (Tastatur, Pairing, Simulator)
+        // 3. Settings Submenu (Tastatur, BLE freigeben, Simulator)
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSettings), I18n.get(Rez.Strings.MenuSettingsSub), "MENU_SETTINGS", null));
 
-        // 5. Exit
+        // 4. Exit
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuExit), null, "MENU_EXIT", null));
 
         WatchUi.pushView(menu, new MainMenuDelegate(), WatchUi.SLIDE_LEFT);

@@ -41,8 +41,10 @@ class DashboardView extends WatchUi.View {
 
         if (pageIndex == 0) {
             drawMessagePage(dc);
-        } else {
+        } else if (pageIndex == 1) {
             drawTelemetryPage(dc);
+        } else {
+            drawSosPage(dc);
         }
 
         drawNavigationIndicators(dc);
@@ -305,6 +307,56 @@ class DashboardView extends WatchUi.View {
     }
 
     // -----------------------------------------------------------------
+    // SCREEN 3: SOS NOTRUF SEITE (Page 2)
+    // -----------------------------------------------------------------
+    private function drawSosPage(dc as Graphics.Dc) as Void {
+        var w = dc.getWidth();
+        var h = dc.getHeight();
+        var cx = w / 2;
+        var cy = h / 2;
+
+        var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
+        var fontTiny  = Graphics.FONT_SYSTEM_TINY;
+        var fontSmall = Graphics.FONT_SYSTEM_SMALL;
+
+        // Top Header
+        dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 48, fontTiny, I18n.get(Rez.Strings.SosHeader), Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Emergency Action Card
+        var cardW = w - 84;
+        var cardH = 200;
+        var cardX = (w - cardW) / 2;
+        var cardY = 105;
+        var cardR = 14;
+
+        dc.setColor(0x220808, Graphics.COLOR_BLACK);
+        dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, cardR);
+        dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, cardR);
+        dc.setPenWidth(1);
+
+        // Glowing red circle with "SOS" text
+        var iconY = cardY + 54;
+        dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(cx, iconY, 26);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, iconY - 14, fontSmall, "SOS", Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Action title
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cardY + 98, fontTiny, "START: NOTRUF STARTEN", Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Details
+        dc.setColor(0xcccccc, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cardY + 132, fontXtiny, I18n.get(Rez.Strings.SosCardChannel), Graphics.TEXT_JUSTIFY_CENTER);
+
+        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cardY + 158, fontXtiny, "GPS + Vitaldaten + 60s Auto-Beacon", Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // -----------------------------------------------------------------
     // NAVIGATION INDICATORS (Standard Garmin triangles + 2 o'clock START cue)
     // -----------------------------------------------------------------
     private function drawNavigationIndicators(dc as Graphics.Dc) as Void {
@@ -324,15 +376,29 @@ class DashboardView extends WatchUi.View {
         dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
 
         if (pageIndex == 0) {
-            // Main page: Down triangle at bottom center
+            // Page 0 (Chat): Down triangle at bottom center
             var triY = h - 28;
             dc.fillPolygon([
                 [cx - (triW / 2), triY],
                 [cx + (triW / 2), triY],
                 [cx, triY + triH]
             ]);
+        } else if (pageIndex == 1) {
+            // Page 1 (Telemetry): Up triangle at top center AND Down triangle at bottom center
+            var triYTop = 18;
+            dc.fillPolygon([
+                [cx - (triW / 2), triYTop + triH],
+                [cx + (triW / 2), triYTop + triH],
+                [cx, triYTop]
+            ]);
+            var triYBot = h - 28;
+            dc.fillPolygon([
+                [cx - (triW / 2), triYBot],
+                [cx + (triW / 2), triYBot],
+                [cx, triYBot + triH]
+            ]);
         } else {
-            // Data page: Up triangle at top center
+            // Page 2 (SOS): Up triangle at top center
             var triY = 18;
             dc.fillPolygon([
                 [cx - (triW / 2), triY + triH],
@@ -344,11 +410,12 @@ class DashboardView extends WatchUi.View {
         // -------------------------------------------------------------
         // 2. BUTTON AT 2 O'CLOCK (START / SELECT)
         // -------------------------------------------------------------
-        var accentColor = 0xff9500; // Consistent Garmin Fenix Orange Accent
+        var accentColor = (pageIndex == 2) ? Graphics.COLOR_RED : 0xff9500;
+        var penW = (pageIndex == 2) ? 4 : 3;
 
         // Curved accent arc at 2 o'clock (centered at 30 deg: from 45 deg to 15 deg CLOCKWISE)
         dc.setColor(accentColor, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(3);
+        dc.setPenWidth(penW);
         dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 45, 15);
         dc.setPenWidth(1);
 

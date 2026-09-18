@@ -11,70 +11,90 @@ Diese Dokumentation beschreibt die vollständige Navigations- und Menühierarchi
 
 ```mermaid
 flowchart TD
-    Dashboard["<b>1. Hauptbildschirm (Dashboard)</b>\n• Statuszeile (Pill, Node, Ziel)\n• Letzte Nachricht (Kartenmodul)\n• Footer: Node-Akku | RSSI | Peers"]
+    Dashboard["<b>1. Hauptbildschirm: Seite 0 (Chat & Dashboard)</b>\n• Statuszeile (Pill, Node, Ziel)\n• Letzte Nachricht (Kartenmodul)\n• Footer: Node-Akku | RSSI | Peers\n• <b>START (2 Uhr)</b>: Chat-Verlauf öffnen\n• <b>MENU (9 Uhr)</b>: Hauptmenü"]
 
-    %% Aktionen vom Dashboard
-    Dashboard -->|Taste START (2 Uhr)\nTaste MENU (9 Uhr)| MainMenu["<b>2. Hauptmenü</b>\n1. Chats\n2. Nachricht senden\n3. Position senden\n4. SOS Notruf\n5. Einstellungen\n6. Beenden"]
-    Dashboard -->|Tap auf Chat-Karte| MsgActionMenu["<b>3. Nachrichten-Aktionen</b>\n• Antworten (Tastatur)\n• Schnellantwort\n• Standort senden\n• 1:1 Direktnachricht"]
-    Dashboard -->|Wisch Links / START| ChatThread["<b>4. Chat-Verlauf (Thread)</b>\n• Scrollbare Nachrichten\n• Eigene (rechts) / Fremde (links)\n• Status: [Wartet auf Node]\n• <b>[Antworten]</b> Button"]
+    %% Aktionen von Seite 0
+    Dashboard -->|<b>Taste START (2 Uhr)</b>\nTap auf Chat-Karte\nWisch nach Links| ChatThread["<b>Chat-Verlauf (Thread)</b>\n• Scrollbare Nachrichten\n• Eigene (rechts) / Fremde (links)\n• <b>1 Klick im Chat!</b>\n• <b>[Antworten]</b> Button"]
+    
+    Dashboard -->|<b>Taste MENU (9 Uhr)</b>| MainMenu["<b>Hauptmenü (Optionen)</b>\n1. Chats\n2. SOS Notruf\n3. Einstellungen\n4. Beenden"]
+
+    Dashboard -->|<b>Taste DOWN (7 Uhr)</b>\nWisch nach Oben| TelemPage["<b>2. Hauptbildschirm: Seite 1 (Telemetrie & GPS)</b>\n• 2x2 Kacheln: HF, GPS, Schritte, Akku\n• <b>START (2 Uhr)</b>: Position sofort senden!\n• Navigation: UP zurück zu Seite 0"]
+
+    TelemPage -->|<b>Taste DOWN (7 Uhr)</b>\nWisch nach Oben| SosPage["<b>3. Hauptbildschirm: Seite 2 (SOS Notruf Prompt)</b>\n• Rote Notruf-Aktionskarte\n• Roter 2-Uhr-Akzentbogen\n• <b>START (2 Uhr) / Tap</b>: Notruf auslösen!\n• Navigation: UP zurück zu Seite 1"]
+
+    Dashboard -->|<b>Tap auf Ziel-Badge [#public]</b>| ChatsMenu["<b>Chats-Menü</b>\n• <b>[Aktiv]</b> steht ganz oben!\n• Kanäle (#public, #notruf, ...)\n• Kontakte (Basisstation, Florian, ...)"]
 
     %% Hauptmenü Verzweigungen
-    MainMenu -->|1. Chats| ChatsMenu["<b>5. Chats-Menü</b>\n• <b>[Aktiv]</b> steht ganz oben!\n• Kanäle (#public, #notruf, ...)\n• Kontakte (Basisstation, Florian, ...)"]
-    MainMenu -->|2. Nachricht senden| CannedMenu["<b>6. Schnellantworten / Canned</b>\n• Freitext schreiben...\n• Alles OK\n• Am Treffpunkt\n• Verspätung 15/30 Min\n• Brauche Hilfe\n• Funkprobe"]
-    MainMenu -->|3. Position senden| SendPos["<b>GPS-Sofortversand</b>\nSendet aktuellen Fix & Vitaldaten\nan das aktive Ziel"]
-    MainMenu -->|4. SOS Notruf| SosView["<b>7. SOS Notruf Screen</b>\n• 5s Countdown (Pulsierender Ring)\n• Vital- & GPS-Telemetriekarte\n• Zyklischer 60s Auto-Repeat"]
-    MainMenu -->|5. Einstellungen| Settings["<b>8. Einstellungen</b>\n• Tastatur-Typ\n• Hintergrund-Prüfung\n• Wardriving FIT-Log\n• Telemetrie-Format\n• Node koppeln\n• Node neu synchronisieren\n• Node freigeben (BLE)\n• Virtueller Node Sim"]
-    MainMenu -->|6. Beenden| Exit["App beenden &\nBackground-Check schärfen"]
+    MainMenu -->|1. Chats| ChatsMenu
+    MainMenu -->|2. SOS Notruf| SosView["<b>SOS Notruf Screen</b>\n• 5s Countdown (Pulsierender Ring)\n• Vital- & GPS-Telemetriekarte\n• Zyklischer 60s Auto-Repeat"]
+    MainMenu -->|3. Einstellungen| Settings["<b>Einstellungen</b>\n• Tastatur-Typ\n• Hintergrund-Prüfung\n• Wardriving FIT-Log\n• Telemetrie-Format\n• Node koppeln\n• Node neu synchronisieren\n• Node freigeben (BLE)\n• Virtueller Node Sim"]
+    MainMenu -->|4. Beenden| Exit["App beenden &\nBackground-Check schärfen"]
+
+    %% SOS Page Verzweigung
+    SosPage -->|<b>Taste START (2 Uhr)</b>\nTap auf Karte| SosView
 
     %% Chat Thread Interaktionen
     ChatThread -->|<b>Touch auf grünen Button</b>| Keyboard["<b>Freitext-Tastatur</b>\n(QWERTY, SMS T9 oder Radial T9)"]
-    ChatThread -->|<b>Hardware-Taste START/ENTER</b>| CannedMenu
+    ChatThread -->|<b>Hardware-Taste START/ENTER</b>| CannedMenu["<b>Schnellantworten / Canned</b>\n• Alles OK\n• Am Treffpunkt\n• Verspätung 15/30 Min\n• Brauche Hilfe / Funkprobe"]
     ChatThread -->|Taste BACK / Wisch Rechts| Dashboard
+
+    %% Telemetrie Interaktion
+    TelemPage -->|Taste START| SendPosDirect["<b>Sofortiger LoRa-Versand</b>\n(DOWN + START = 2 Tastendrücke)"]
+    TelemPage -->|Taste UP / BACK| Dashboard
 
     %% Settings Verzweigungen
     Settings -->|Tastatur-Typ| KeySettings["<b>Tastatur-Auswahl</b>\n• Vollbild-QWERTY\n• SMS T9 (3x4)\n• Radial T9"]
     Settings -->|Node freigeben (BLE)| ReleaseBLE["<b>BLE-Freigabe (3 Min)</b>\nunpairDevice() -> Freie Bahn für\nT-1000E Smartphone-App"]
-    Settings -->|Virtueller Node Sim| NodeSim["<b>9. Node-Simulator</b>\n• Offline-Puffer füllen (3 Msgs)\n• Funkspruch / SOS einspeisen\n• Neuer Kontakt (Delta)\n• Echo-Modus AN/AUS"]
+    Settings -->|Virtueller Node Sim| NodeSim["<b>Node-Simulator</b>\n• Offline-Puffer füllen (3 Msgs)\n• Funkspruch / SOS einspeisen\n• Neuer Kontakt (Delta)\n• Echo-Modus AN/AUS"]
     Settings -->|Node neu synchronisieren| FullSync["<b>5-Stufen Session-Sync</b>\nInbox -> Time -> Channels ->\nContacts -> Battery"]
 
     %% Verknüpfungen
     ChatsMenu -->|Chat auswählen| ChatThread
-    MsgActionMenu -->|Antworten (Tastatur)| Keyboard
-    MsgActionMenu -->|Schnellantwort| CannedMenu
 ```
 
 ---
 
 ## 2. Detaillierte Bildschirm- & Menü-Referenz
 
-### 2.1 Hauptbildschirm (`DashboardView` & `DashboardDelegate`)
+### 2.1 Hauptseiten (`DashboardView` & `DashboardDelegate`)
 
-Der primäre Kontrollbildschirm beim Starten der App.
+Der Hauptbildschirm umfasst **3 Seiten**, die intuitiv über die Hardware-Tasten **DOWN (7 Uhr)** und **UP (9 Uhr)** bzw. vertikale Wischgesten umgeschaltet werden:
 
-| Element / Interaktion | Eingabemethode | Aktion / Auswirkung |
-|---|---|---|
-| **Status-Pill (oben)** | Nur Anzeige | Zeigt Verbindungsstatus (`Bereit`, `Suche...`, `Verbunden`, `Offline`). |
-| **Ziel-Badge (oben rechts)** | Nur Anzeige | Zeigt das aktive Sendeziel (z. B. `[#public]` oder `[Florian]`). |
-| **Chat-Kartenmodul (Mitte)** | **Tap auf Karte** | Öffnet das **Nachrichten-Aktionsmenü** (Schnellantwort, Standort, Tastatur). |
-| **Karten-Auswahl** | **Taste START (2 Uhr)** | Öffnet bei fokussierter Karte den vollen Chatverlauf (`ChatThreadView`). |
-| **Menü-Aufruf** | **Taste START / MENU (9 Uhr)** | Öffnet das **Hauptmenü** (`openMainMenu()`). |
-| **Akzentbogen (2 Uhr)** | Nur Anzeige | Gelber/Oranger Bogen weist haptisch/visuell auf die START-Taste hin. |
-| **Statuszeile (unten)** | Nur Anzeige | **[Remote Node Akku %]** \| **[LoRa RSSI dBm]** \| **[Mesh Peers]**. |
+#### Seite 0: Chat & Dashboard (`pageIndex == 0`)
+* **Taste START (2 Uhr):** Öffnet **sofort den aktiven Chat-Verlauf** (`ChatThreadView`). *Nur 1 Klick!*
+* **Taste MENU (9 Uhr):** Öffnet das **Hauptmenü** (`openMainMenu()`).
+* **Taste DOWN (7 Uhr) / Wisch nach oben:** Wechselt zu **Seite 1 (Telemetrie & GPS)**.
+* **Tap auf Ziel-Badge (`[#public]`):** Öffnet direkt die Chat- und Kanalliste (`ChatsMenu`).
+* **Tap auf Chat-Karte / Wisch nach links:** Öffnet direkt den Chat-Verlauf (`ChatThreadView`).
+* **Statuszeile:** **[Remote Node Akku %]** \| **[LoRa RSSI dBm]** \| **[Mesh Peers]**.
+* **Navigations-Indikator:** Nach unten zeigendes Dreieck am unteren Rand.
+
+#### Seite 1: Telemetrie & Sensoren (`pageIndex == 1`)
+* **Taste START (2 Uhr):** **Sendet sofort GPS-Koordinaten + Vitaldaten** an das aktive Ziel (`sendPositionDirect()`). *Kein Menü nötig!*
+* **Taste DOWN (7 Uhr) / Wisch nach oben:** Wechselt zu **Seite 2 (SOS Notruf)**.
+* **Taste UP (9 Uhr) / Taste BACK (4 Uhr) / Wisch nach rechts:** Zurück zu **Seite 0 (Chat)**.
+* **Anzeige:** 2x2 Kacheln (Herzfrequenz, GPS-Fix-Status, Schritte, Akku).
+* **Navigations-Indikatoren:** Dreiecke oben (UP) und unten (DOWN).
+
+#### Seite 2: SOS Notruf Prompt (`pageIndex == 2`)
+* **Taste START (2 Uhr) / Tap auf Notruf-Karte:** Startet **sofort die Notruf-Sequenz** (`SosView`).
+* **Taste UP (9 Uhr) / Taste BACK (4 Uhr) / Wisch nach rechts:** Zurück zu **Seite 1 (Telemetrie)**.
+* **Anzeige:** Rote Notruf-Karte mit pulsendem "SOS"-Symbol, Notfallkanal 0, Hinweisen auf GPS + Vitaldaten + 60s Auto-Beacon.
+* **Optisches Highlight:** Roter Akzentbogen bei 2 Uhr (`Graphics.COLOR_RED`, 4px Strichstärke).
+* **Navigations-Indikator:** Nach oben zeigendes Dreieck am oberen Rand.
 
 ---
 
 ### 2.2 Hauptmenü (`openMainMenu()`)
 
-Wird durch Druck auf START (2 Uhr) oder MENÜ (9 Uhr) geöffnet.
+Wird durch Druck auf **MENÜ (9 Uhr)** auf Seite 0 geöffnet. Durch die Auslagerung des Standortversands auf Seite 1 (DOWN + START) ist das Menü maximal verschlankt und verzögerungsfrei:
 
 | Menüpunkt | Untertitel | Ziel-Aktion |
 |---|---|---|
-| **1. Chats** | `Aktiv: <Aktuelles Ziel>` | Öffnet die Chat-Übersicht (`ChatsMenu`). |
-| **2. Nachricht senden** | `Aus Liste` | Öffnet die Vorlagenliste (`CannedMessageMenu`). |
-| **3. Position senden** | `GPS + Vitals` | Sendet sofort Koordinaten + Vitaldaten an das aktive Ziel. |
-| **4. SOS Notruf** | `Notfall-Broadcast` | Startet den Notruf-Ablauf (`SosView`) auf Notfallkanal 0. |
-| **5. Einstellungen** | `Tastatur, Node...` | Öffnet das Einstellungsmenü (`SettingsMenu`). |
-| **6. Beenden** | - | Schließt die App; aktiviert zyklischen 5-Min-Hintergrund-Check. |
+| **1. Chats** | `Aktiv: <Aktuelles Ziel>` | Öffnet die Chat-Übersicht (`ChatsMenu`) zur Zielauswahl. |
+| **2. SOS Notruf** | `Notfall-Broadcast` | Redundanter Schnellzugriff auf Notruf (`SosView`) auf Notfallkanal 0. |
+| **3. Einstellungen** | `Tastatur, Node...` | Öffnet das Einstellungsmenü (`SettingsMenu`). |
+| **4. Beenden** | - | Schließt die App; aktiviert zyklischen 5-Min-Hintergrund-Check. |
 
 ---
 

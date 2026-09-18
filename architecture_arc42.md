@@ -352,6 +352,12 @@ POS: <LAT>,<LON> | <ALT> | HF:<HR> | <SPEED> [STAT]
   1. *Freigabe (`MeshBleManager.releaseNode`)*: Trennt die BLE-Verbindung via `BluetoothLowEnergy.unpairDevice`, bereinigt alle Verbindungsmetriken und setzt einen Timestamp-Sperrfilter (`_pauseScanUntil = now + pauseSeconds`, Standard 180s).
   2. *Freie Bahn für das Smartphone*: Die Funk-Node sendet sofort wieder offenes BLE-Advertising und kann von der Smartphone-App gekoppelt werden, ohne dass die Uhr dazwischenfunkt.
   3. *Manuelles Reconnect*: Wählt der Benutzer auf der Uhr "Node koppeln" oder "Node neu synchronisieren", wird der Sperrfilter via `resumeScan()` sofort aufgehoben und die Verbindung priorisiert wiederhergestellt.
+* **ADR 12: 3-Seiten Hauptnavigation & Tasten-Ergonomie (Zero-Clutter UI):**
+  Zur Steigerung der Bedienungseffizienz und Ergonomie bei Outdoor-Aktivitäten mit Handschuhen wurde die Navigation auf ein 3-Seiten-Modell aufgeteilt:
+  1. *Seite 0 (Chat & Dashboard)*: Fokus auf Kommunikation. Taste `START` (2 Uhr) öffnet direkt den aktiven Chat-Verlauf (`ChatThreadView`) in genau 1 Klick. Taste `MENU` (9 Uhr) öffnet das Hauptmenü.
+  2. *Seite 1 (Telemetrie & Sensoren)*: Erreichbar über `DOWN` (7 Uhr). Taste `START` sendet sofort den aktuellen GPS-Fix und Vitaldaten via LoRa (`sendPositionDirect()`). Damit entfällt der Menüpunkt "Position senden" im Hauptmenü vollständig (2 Klicks: `DOWN` + `START`).
+  3. *Seite 2 (SOS Notruf Prompt)*: Erreichbar über erneutes `DOWN` von Seite 1. Zeigt eine visuelle Notfall-Aktionskarte mit rotem 2-Uhr-Akzentbogen (`COLOR_RED`). `START` (2 Uhr) oder Touch-Tap löst direkt die 5-Sekunden-Notrufsequenz (`SosView`) aus.
+  4. *Hauptmenü-Verschlankung*: Das Hauptmenü (`openMainMenu()`) wurde auf 4 Kernpunkte reduziert (Chats, SOS Notruf, Einstellungen, Beenden), wodurch die Menühöhe sinkt und versehentliche Fehlauswahlen unter Stress vermieden werden.
 
 ---
 
