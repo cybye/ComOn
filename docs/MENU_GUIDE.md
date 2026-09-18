@@ -171,7 +171,7 @@ Lebensrettende Notfallfunktion mit Absicherung gegen Fehlbedienung.
 Phase 1: 5-Sekunden Countdown
   • Roter pulsierender Ring mit großem Zähler (5..4..3..2..1)
   • Taste BACK: Bricht sofort ab (kein Funkverkehr)
-  • Taste START: Überspringt Countdown und sendet sofort
+  • Countdown läuft zwingend ab (Schutz vor Fehlalarmen durch versehentlichen Doppelklick auf START)
       │
       ▼
 Phase 2: Notruf aktiv (LoRa Broadcast auf Kanal 0)

@@ -171,21 +171,15 @@ class SosDelegate extends WatchUi.BehaviorDelegate {
     }
 
     function onSelect() as Boolean {
-        if (_view != null && !(_view as SosView).sosSent) {
-            (_view as SosView).sendSosNow();
-            WatchUi.requestUpdate();
-            return true;
-        }
-        return false;
+        // Der 5s-Countdown muss zwingend ablaufen (Schutz vor Fehlalarmen durch Doppel-Klick auf START)
+        return true;
     }
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
-        if (keyEvent.getKey() == WatchUi.KEY_ENTER) {
-            if (_view != null && !(_view as SosView).sosSent) {
-                (_view as SosView).sendSosNow();
-                WatchUi.requestUpdate();
-                return true;
-            }
+        var key = keyEvent.getKey();
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            // Countdown kann nicht uebersprungen werden
+            return true;
         }
         return false;
     }
