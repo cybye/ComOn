@@ -55,6 +55,12 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
+    //! MENU BUTTON
+    function onMenu() as Boolean {
+        openMainMenu();
+        return true;
+    }
+
     //! Explicit key handler
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
@@ -64,6 +70,8 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             return onPreviousPage();
         } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
             return onSelect();
+        } else if (key == WatchUi.KEY_MENU) {
+            return onMenu();
         }
         return false;
     }
@@ -89,35 +97,29 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         var chIdx = ContactManager.selectedChannelIdx;
         var success = bleMgr.sendCurrentPosition(chIdx);
         
-        var msg = success ? "Position gesendet" : "Nicht verbunden!";
+        var msg = success ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected);
         WatchUi.showToast(msg, null);
     }
 
     private function openMainMenu() as Void {
-        var menu = new WatchUi.Menu2({ :title => "MeshCore" });
-        var bleMgr = getBleManager();
-        var lastSender = bleMgr.lastSender;
+        var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.MenuTitle) });
 
-        // 1. Quick Reply item at top of menu (START -> START for instant reply)
-        var replyLabel = (!lastSender.equals("Mesh")) ? ("Antwort an " + lastSender) : "Antworten";
-        menu.addItem(new WatchUi.MenuItem(replyLabel, "Direktantwort / Tastatur", "MENU_REPLY", null));
+        // 1. Chats (with active target, threads & unread status)
+        var targetLabel = I18n.format(Rez.Strings.MenuActiveTarget, [ ContactManager.getTargetDisplayName() ]);
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuChats), targetLabel, "MENU_CHATS", null));
 
-        // 2. Chats (replaces Ziel wählen and contains thread history)
-        var targetLabel = "Aktiv: " + ContactManager.getTargetDisplayName();
-        menu.addItem(new WatchUi.MenuItem("Chats", targetLabel, "MENU_CHATS", null));
+        // 2. Send message & position
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendMsg), I18n.get(Rez.Strings.MenuSendMsgSub), "MENU_MSG", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendPosition), I18n.get(Rez.Strings.MenuSendPositionSub), "MENU_POS", null));
 
-        // 3. Send message & position
-        menu.addItem(new WatchUi.MenuItem("Nachricht senden", "Aus Liste", "MENU_MSG", null));
-        menu.addItem(new WatchUi.MenuItem("Position senden", "GPS + Vitaldaten", "MENU_POS", null));
+        // 3. SOS Emergency
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSos), I18n.get(Rez.Strings.MenuSosSub), "MENU_SOS", null));
 
-        // 4. SOS Emergency
-        menu.addItem(new WatchUi.MenuItem("SOS Notruf", "Notfall Broadcast", "MENU_SOS", null));
+        // 4. Settings Submenu (Tastatur, Pairing, Simulator)
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSettings), I18n.get(Rez.Strings.MenuSettingsSub), "MENU_SETTINGS", null));
 
-        // 5. Settings Submenu (Tastatur, Pairing, Simulator)
-        menu.addItem(new WatchUi.MenuItem("Einstellungen", "Tastatur, Node...", "MENU_SETTINGS", null));
-
-        // 6. Exit
-        menu.addItem(new WatchUi.MenuItem("App beenden", null, "MENU_EXIT", null));
+        // 5. Exit
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuExit), null, "MENU_EXIT", null));
 
         WatchUi.pushView(menu, new MainMenuDelegate(), WatchUi.SLIDE_LEFT);
     }
@@ -146,9 +148,10 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
         } else if (id.equals("MENU_POS")) {
             var ok = bleMgr.sendCurrentPosition(chIdx);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(ok ? "Position gesendet" : "Nicht verbunden", null);
+            WatchUi.showToast(ok ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected), null);
         } else if (id.equals("MENU_SOS")) {
-            WatchUi.pushView(new SosView(), new SosDelegate(), WatchUi.SLIDE_UP);
+            var sos = new SosView();
+            WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
         } else if (id.equals("MENU_SETTINGS")) {
             WatchUi.pushView(new SettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_EXIT")) {

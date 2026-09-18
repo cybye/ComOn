@@ -1,0 +1,16 @@
+<resources xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://developer.garmin.com/downloads/connect-iq/resources.xsd">
+    <fitContributions>
+        <fitField id="0" displayInChart="true" sortOrder="0" precision="0"
+                  chartTitle="@Strings.FitRssiChart" dataLabel="@Strings.FitRssiLabel"
+                  unitLabel="@Strings.FitRssiUnit" fillColor="#00A8FF" />
+        <fitField id="1" displayInChart="true" sortOrder="1" precision="0"
+                  chartTitle="@Strings.FitSnrChart" dataLabel="@Strings.FitSnrLabel"
+                  unitLabel="@Strings.FitSnrUnit" fillColor="#00E676" />
+        <fitField id="2" displayInChart="true" sortOrder="2" precision="0"
+                  chartTitle="@Strings.FitPeersChart" dataLabel="@Strings.FitPeersLabel"
+                  unitLabel="@Strings.FitPeersUnit" fillColor="#FFD600" />
+        <fitField id="3" displayInChart="true" sortOrder="3" precision="0"
+                  chartTitle="@Strings.FitBatChart" dataLabel="@Strings.FitBatLabel"
+                  unitLabel="@Strings.FitBatUnit" fillColor="#FF9100" />
+    </fitContributions>
+</resources>

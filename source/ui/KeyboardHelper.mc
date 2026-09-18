@@ -1,6 +1,7 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.Application.Storage;
+import Toybox.System;
 
 class KeyboardHelper {
     public static const MODE_QWERTY as Number = 0;
@@ -47,6 +48,7 @@ class KeyboardHelper {
 
     public static function openKeyboard(initialText as String) as Void {
         var mode = getKeyboardMode();
+        System.println("KeyboardHelper.openKeyboard: mode=" + mode + " (" + getModeName(mode) + ")");
         if (mode == MODE_NATIVE) {
             if (WatchUi has :TextPicker) {
                 WatchUi.pushView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);

@@ -3,7 +3,11 @@ import Toybox.Lang;
 
 class ChatsMenu extends WatchUi.Menu2 {
     function initialize() {
-        Menu2.initialize({ :title => "Chats" });
+        Menu2.initialize({ :title => I18n.get(Rez.Strings.ChatsTitle) });
+
+        var activeBadge = I18n.get(Rez.Strings.ActiveBadge);
+        var activeItem = null;
+        var otherItems = [] as Array<WatchUi.MenuItem>;
 
         // 1. Group Channels
         var channels = ContactManager.getChannels();
@@ -19,21 +23,25 @@ class ChatsMenu extends WatchUi.Menu2 {
 
             var sub = "";
             if (unread > 0) {
-                sub += "[" + unread + " neu] ";
+                sub += I18n.format(Rez.Strings.NewBadge, [ unread ]) + " ";
             }
             if (isActive) {
-                sub += "[Aktiv] ";
+                sub += activeBadge + " ";
             }
 
             if (lastMsg != null) {
                 var s = lastMsg[:sender] as String;
                 var txt = lastMsg[:text] as String;
                 sub += s + ": " + txt;
-            } else {
-                sub += "Kanal";
             }
 
-            addItem(new WatchUi.MenuItem(name, sub, tid, null));
+            var subVal = (sub.length() > 0) ? sub : null;
+            var item = new WatchUi.MenuItem(name, subVal, tid, null);
+            if (isActive) {
+                activeItem = item;
+            } else {
+                otherItems.add(item);
+            }
         }
 
         // 2. Direct Contacts (1:1 DMs)
@@ -50,21 +58,33 @@ class ChatsMenu extends WatchUi.Menu2 {
 
             var sub = "";
             if (unread > 0) {
-                sub += "[" + unread + " neu] ";
+                sub += I18n.format(Rez.Strings.NewBadge, [ unread ]) + " ";
             }
             if (isActive) {
-                sub += "[Aktiv] ";
+                sub += activeBadge + " ";
             }
 
             if (lastMsg != null) {
                 var s = lastMsg[:sender] as String;
                 var txt = lastMsg[:text] as String;
                 sub += s + ": " + txt;
-            } else {
-                sub += "1:1 Kontakt";
             }
 
-            addItem(new WatchUi.MenuItem(cname, sub, tid, null));
+            var subValCt = (sub.length() > 0) ? sub : null;
+            var item = new WatchUi.MenuItem(cname, subValCt, tid, null);
+            if (isActive) {
+                activeItem = item;
+            } else {
+                otherItems.add(item);
+            }
+        }
+
+        // Active chat is placed first at the top
+        if (activeItem != null) {
+            addItem(activeItem);
+        }
+        for (var k = 0; k < otherItems.size(); k++) {
+            addItem(otherItems[k]);
         }
     }
 }

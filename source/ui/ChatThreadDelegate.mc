@@ -1,43 +1,31 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
+import Toybox.System;
 
-class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
+class ChatThreadDelegate extends WatchUi.InputDelegate {
     private var _view as ChatThreadView;
 
     function initialize(view as ChatThreadView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         _view = view;
-    }
-
-    function onBack() as Boolean {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-        return true;
-    }
-
-    function onSelect() as Boolean {
-        // START button opens reply menu (direct answers + keyboard option)
-        WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
-        return true;
-    }
-
-    function onNextPage() as Boolean {
-        _view.scrollDown();
-        return true;
-    }
-
-    function onPreviousPage() as Boolean {
-        _view.scrollUp();
-        return true;
     }
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
-        if (key == WatchUi.KEY_DOWN) {
-            return onNextPage();
-        } else if (key == WatchUi.KEY_UP) {
-            return onPreviousPage();
+        if (key == WatchUi.KEY_ESC) {
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return true;
         } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-            return onSelect();
+            // Hardware START / ENTER button opens canned reply menu as requested
+            System.println("ChatThread: Hardware START button pressed -> opening CannedMessageMenu");
+            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
+            return true;
+        } else if (key == WatchUi.KEY_DOWN) {
+            _view.scrollDown();
+            return true;
+        } else if (key == WatchUi.KEY_UP) {
+            _view.scrollUp();
+            return true;
         }
         return false;
     }
@@ -46,10 +34,14 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
         var coords = clickEvent.getCoordinates();
         var tx = coords[0];
         var ty = coords[1];
+        System.println("ChatThread: onTap at [" + tx + ", " + ty + "]");
 
-        // Bottom [Antworten] button bounds: x: 100..350, y: 370..435
-        if (tx >= 100 && tx <= 350 && ty >= 370 && ty <= 435) {
-            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
+        // Bottom green [Reply / Antworten] touch button bounds
+        // Button is drawn at y: 376..420, x: 122..332 on 454x454 screen.
+        // Generous bounds ensure reliable hit detection for any tap in the button area.
+        if (ty >= 355 && tx >= 60 && tx <= 394) {
+            System.println("ChatThread: Green Reply button clicked -> opening keyboard directly");
+            KeyboardHelper.openKeyboard("");
             return true;
         }
 
@@ -57,7 +49,7 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
         if (ty >= 20 && ty < 195) {
             _view.scrollUp();
             return true;
-        } else if (ty >= 195 && ty < 370) {
+        } else if (ty >= 195 && ty < 355) {
             _view.scrollDown();
             return true;
         }
@@ -71,6 +63,9 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
             return true;
         } else if (dir == WatchUi.SWIPE_DOWN) {
             _view.scrollUp();
+            return true;
+        } else if (dir == WatchUi.SWIPE_RIGHT) {
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return true;
         }
         return false;

@@ -40,7 +40,7 @@ class ChatHistoryManager {
         // Pre-seed with initial messages if empty
         if (_messages.size() == 0) {
             var now = Time.now().value();
-            addMessageWithTime("CH_0", "Basisstation", "MeshCore Gateway online. Kanal 0 bereit.", false, now - 600, true);
+            addMessageWithTime("CH_0", "Basisstation", "Mesh Gateway online. Kanal 0 bereit.", false, now - 600, true);
             addMessageWithTime("CH_0", "Florian", "Funktest Bergwacht OK. Empfang sauber.", false, now - 180, false);
             addMessageWithTime("CH_0", "Ich", "Verstanden, danke!", true, now - 120, true);
             addMessageWithTime("CT_NODE_COMP1", "Begleiter 1", "Bin 200m hinter dir am Steig.", false, now - 300, false);

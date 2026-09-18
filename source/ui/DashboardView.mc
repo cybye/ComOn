@@ -65,16 +65,16 @@ class DashboardView extends WatchUi.View {
 
         // 1. Top Header: Status
         var statusColor = Graphics.COLOR_RED;
-        var statusText = "Getrennt";
+        var statusText = I18n.get(Rez.Strings.StatusDisconnected);
         if (bleMgr.isSyncing) {
             statusColor = 0x00d4ff; // Cyan
-            statusText = "Sync mit Node...";
+            statusText = I18n.get(Rez.Strings.StatusSyncing);
         } else if (bleMgr.isConnected) {
             statusColor = Graphics.COLOR_GREEN;
-            statusText = bleMgr.deviceName;
+            statusText = (bleMgr.deviceName != null && bleMgr.deviceName.length() > 0) ? bleMgr.deviceName : I18n.get(Rez.Strings.StatusConnected);
         } else if (bleMgr.isScanning) {
             statusColor = Graphics.COLOR_YELLOW;
-            statusText = "Suche Node...";
+            statusText = I18n.get(Rez.Strings.StatusScanning);
         }
 
         var topY = 34;
@@ -82,13 +82,13 @@ class DashboardView extends WatchUi.View {
         var dotX = cx - (textWidth / 2) - 12;
 
         dc.setColor(statusColor, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(dotX, topY + 9, 5);
+        dc.fillCircle(dotX, topY + 13, 5);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx + 4, topY, fontXtiny, statusText, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Target Channel / Contact Badge
-        var targetY = 62;
+        var targetY = 64;
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT); // Cyan
         dc.drawText(cx, targetY, fontXtiny, "[" + ContactManager.getTargetDisplayName() + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
@@ -104,61 +104,81 @@ class DashboardView extends WatchUi.View {
         dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, 14);
 
         var fontH = dc.getFontHeight(fontXtiny);
+        var senderName = bleMgr.lastSender;
+        var hasCustomSender = (senderName != null && senderName.length() > 0 && !senderName.equals("Mesh"));
 
-        // Header inside card: Replaces "LETZTE NACHRICHT" with actual Sender name
-        var senderTitle = bleMgr.lastSender;
-        if (senderTitle == null || senderTitle.length() == 0 || senderTitle.equals("Mesh")) {
-            if (bleMgr.lastReceivedMessage.equals("Bereit zum Empfang")) {
-                senderTitle = "BEREIT ZUM EMPFANG";
-            } else {
-                senderTitle = "NACHRICHT";
+        if (hasCustomSender) {
+            var senderTitle = senderName;
+            var maxSenderW = cardW - 44;
+            if (dc.getTextWidthInPixels(senderTitle, fontXtiny) > maxSenderW) {
+                while (dc.getTextWidthInPixels(senderTitle + "...", fontXtiny) > maxSenderW && senderTitle.length() > 3) {
+                    senderTitle = senderTitle.substring(0, senderTitle.length() - 1);
+                }
+                senderTitle += "...";
+            }
+
+            var headerY = cardY + 10;
+            dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Garmin Orange Accent
+            dc.drawText(cx, headerY, fontXtiny, senderTitle + ":", Graphics.TEXT_JUSTIFY_CENTER);
+
+            // Subtle separator line
+            var sepY = headerY + fontH + 4;
+            dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
+            dc.drawLine(cardX + 20, sepY, cardX + cardW - 20, sepY);
+
+            // Multi-line message text
+            var maxTextWidth = cardW - 32;
+            var lineSpacing = 4;
+            var lineHeight = fontH + lineSpacing;
+            
+            var msgTop = sepY + 6;
+            var msgBottom = cardY + cardH - 10;
+            var availableH = msgBottom - msgTop;
+            var maxLines = (availableH / lineHeight).toNumber();
+            if (maxLines < 1) { maxLines = 1; }
+
+            var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, maxLines);
+            var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
+            var startY = msgTop + ((availableH - totalTextH) / 2);
+
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            for (var i = 0; i < lines.size(); i++) {
+                dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
+            }
+        } else {
+            // When no custom sender, center cleanly without redundant header or line
+            var msgText = bleMgr.lastReceivedMessage;
+            if (msgText == null || msgText.length() == 0 || msgText.equals("Bereit zum Empfang")) {
+                msgText = I18n.get(Rez.Strings.ReadyToReceive);
+            }
+            var maxTextWidth = cardW - 32;
+            var lineSpacing = 4;
+            var lineHeight = fontH + lineSpacing;
+            var lines = wrapText(dc, msgText, fontXtiny, maxTextWidth, 4);
+            var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
+            var startY = cardY + ((cardH - totalTextH) / 2);
+
+            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            for (var j = 0; j < lines.size(); j++) {
+                dc.drawText(cx, startY + (j * lineHeight), fontXtiny, lines[j], Graphics.TEXT_JUSTIFY_CENTER);
             }
         }
-        
-        // Truncate senderTitle if too wide for the card
-        var maxSenderW = cardW - 44;
-        if (dc.getTextWidthInPixels(senderTitle, fontXtiny) > maxSenderW) {
-            while (dc.getTextWidthInPixels(senderTitle + "...", fontXtiny) > maxSenderW && senderTitle.length() > 3) {
-                senderTitle = senderTitle.substring(0, senderTitle.length() - 1);
+
+        // 3. Compact status footer with vector symbols: [Bat-Icon] 84% | -84 dBm | [Mesh-Icon] 3
+        var bat = 0;
+        var batText = "--%";
+        if (bleMgr.isConnected) {
+            if (bleMgr.nodeBatteryPercent != null) {
+                bat = bleMgr.nodeBatteryPercent as Number;
+                batText = bat.toString() + "%";
+            } else if (bleMgr.isSimulated) {
+                bat = bleMgr.virtualNode.batteryPercent;
+                batText = bat.toString() + "%";
             }
-            senderTitle += "...";
         }
-
-        var headerY = cardY + 10;
-        dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Garmin Orange Accent
-        dc.drawText(cx, headerY, fontXtiny, senderTitle, Graphics.TEXT_JUSTIFY_CENTER);
-
-        // Subtle separator line
-        var sepY = headerY + fontH + 4;
-        dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
-        dc.drawLine(cardX + 20, sepY, cardX + cardW - 20, sepY);
-
-        // Multi-line message text: Full height used (no bottom sender footer needed)
-        var maxTextWidth = cardW - 32;
-        var lineSpacing = 4;
-        var lineHeight = fontH + lineSpacing;
-        
-        var msgTop = sepY + 6;
-        var msgBottom = cardY + cardH - 10;
-        var availableH = msgBottom - msgTop;
-        var maxLines = (availableH / lineHeight).toNumber();
-        if (maxLines < 1) { maxLines = 1; }
-
-        var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, maxLines);
-        var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
-        var startY = msgTop + ((availableH - totalTextH) / 2);
-
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        for (var i = 0; i < lines.size(); i++) {
-            dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
-        }
-
-        // 3. Compact status footer with vector symbols: [Bat-Icon] 85% | -84 dBm | [Mesh-Icon] 3
-        var bat = tlm.getBatteryPercent().toNumber();
-        var batText = bat.toString() + "%";
         var divText = " | ";
 
-        var loraText = "Offline";
+        var loraText = I18n.get(Rez.Strings.TelemetryOff);
         var loraColor = 0x666666;
         var nodeText = "0";
         var nodeColor = 0x666666;
@@ -175,7 +195,7 @@ class DashboardView extends WatchUi.View {
                     loraColor = 0xff5555; // Red/Orange (Schwach)
                 }
             } else {
-                loraText = "OK";
+                loraText = I18n.get(Rez.Strings.TelemetryOk);
                 loraColor = 0x00e676;
             }
             nodeText = bleMgr.peerCount.toString();
@@ -241,7 +261,7 @@ class DashboardView extends WatchUi.View {
 
         // Title
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 40, fontXtiny, "TELEMETRIE", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, 40, fontXtiny, I18n.get(Rez.Strings.TelemetryTitle), Graphics.TEXT_JUSTIFY_CENTER);
 
         // Grid 2x2 Boxes (Centered vertically at cy = 227)
         var boxW = 140;
@@ -254,8 +274,8 @@ class DashboardView extends WatchUi.View {
         var row1Y = cy - (totalGridH / 2) + 6; // ~153px
         var row2Y = row1Y + boxH + gap;       // ~240px
 
-        // Box 1: HRF
-        drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, "HRF", 0x1f1111);
+        // Box 1: HR / HRF
+        drawTelemetryBox(dc, box1X, row1Y, boxW, boxH, I18n.get(Rez.Strings.SensorHeartRate), 0x1f1111);
         var hr = tlm.getHeartRate();
         var hrStr = (hr != null) ? hr.toString() + " bpm" : "-- bpm";
         dc.setColor(0xff3b30, Graphics.COLOR_TRANSPARENT);
@@ -264,21 +284,21 @@ class DashboardView extends WatchUi.View {
         // Box 2: GPS
         var gpsBg = tlm.hasGpsFix ? 0x112211 : 0x1a1a1a;
         drawTelemetryBox(dc, box2X, row1Y, boxW, boxH, "GPS", gpsBg);
-        var gpsText = tlm.hasGpsFix ? "FIX OK" : "SUCHE...";
+        var gpsText = tlm.hasGpsFix ? I18n.get(Rez.Strings.GpsFixOk) : I18n.get(Rez.Strings.GpsSearching);
         var gpsColor = tlm.hasGpsFix ? Graphics.COLOR_GREEN : Graphics.COLOR_ORANGE;
         var gpsFont = tlm.hasGpsFix ? fontTiny : fontXtiny;
         dc.setColor(gpsColor, Graphics.COLOR_TRANSPARENT);
         dc.drawText(box2X + (boxW/2), row1Y + 36, gpsFont, gpsText, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Box 3: SCHRITTE
-        drawTelemetryBox(dc, box1X, row2Y, boxW, boxH, "SCHRITTE", 0x14161c);
+        // Box 3: STEPS / SCHRITTE
+        drawTelemetryBox(dc, box1X, row2Y, boxW, boxH, I18n.get(Rez.Strings.SensorSteps), 0x14161c);
         var steps = tlm.getSteps();
         var stepsStr = (steps != null) ? steps.toString() : "0";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(box1X + (boxW/2), row2Y + 34, fontTiny, stepsStr, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Box 4: BATT
-        drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, "BATT", 0x14161c);
+        // Box 4: BATT / AKKU
+        drawTelemetryBox(dc, box2X, row2Y, boxW, boxH, I18n.get(Rez.Strings.SensorBattery), 0x14161c);
         var batStr = tlm.getBatteryPercent().format("%.0f") + "%";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(box2X + (boxW/2), row2Y + 34, fontTiny, batStr, Graphics.TEXT_JUSTIFY_CENTER);
@@ -324,7 +344,6 @@ class DashboardView extends WatchUi.View {
         // -------------------------------------------------------------
         // 2. BUTTON AT 2 O'CLOCK (START / SELECT)
         // -------------------------------------------------------------
-        var btnLabel = (pageIndex == 0) ? "MENÜ" : "POS";
         var accentColor = 0xff9500; // Consistent Garmin Fenix Orange Accent
 
         // Curved accent arc at 2 o'clock (centered at 30 deg: from 45 deg to 15 deg CLOCKWISE)
@@ -333,7 +352,9 @@ class DashboardView extends WatchUi.View {
         dc.drawArc(cx, cy, r, Graphics.ARC_CLOCKWISE, 45, 15);
         dc.setPenWidth(1);
 
-        // Draw radial text at 2 o'clock (30 degrees)
+        // Textbeschriftung auskommentiert:
+        /*
+        var btnLabel = (pageIndex == 0) ? "MENÜ" : "POS";
         if (_vectorFont != null && (dc has :drawRadialText)) {
             dc.drawRadialText(
                 cx,
@@ -349,6 +370,7 @@ class DashboardView extends WatchUi.View {
             // Fallback if vector font not supported
             dc.drawText(w - 28, 110, fontXtiny, btnLabel, Graphics.TEXT_JUSTIFY_RIGHT);
         }
+        */
     }
 
     private function drawTelemetryBox(dc as Graphics.Dc, x as Number, y as Number, w as Number, h as Number, title as String, bgColor as Number) as Void {

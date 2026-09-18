@@ -3,17 +3,17 @@ import Toybox.Lang;
 
 class CannedMessageMenu extends WatchUi.Menu2 {
     function initialize() {
-        Menu2.initialize({ :title => "Antworten" });
+        Menu2.initialize({ :title => I18n.get(Rez.Strings.ReplyTitle) });
 
         // Position at the very top of message list
-        addItem(new WatchUi.MenuItem("Freitext schreiben...", "Tastatur", "MSG_CUSTOM", null));
-        addItem(new WatchUi.MenuItem("Position senden", "GPS + Vitaldaten", "MSG_POS", null));
-        addItem(new WatchUi.MenuItem("Alles OK", "Status", "MSG_OK", null));
-        addItem(new WatchUi.MenuItem("Am Treffpunkt", "Status", "MSG_DEST", null));
-        addItem(new WatchUi.MenuItem("Verzögerung 15 min", "Zeit", "MSG_DEL15", null));
-        addItem(new WatchUi.MenuItem("Verzögerung 30 min", "Zeit", "MSG_DEL30", null));
-        addItem(new WatchUi.MenuItem("Brauche Hilfe", "Dringend", "MSG_HELP", null));
-        addItem(new WatchUi.MenuItem("Funktest", "Test", "MSG_TEST", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuCustomMsg), I18n.get(Rez.Strings.MenuCustomMsgSub), "MSG_CUSTOM", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendPosition), I18n.get(Rez.Strings.MenuSendPositionSub), "MSG_POS", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.CannedOk), I18n.get(Rez.Strings.CannedOkSub), "MSG_OK", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.CannedAtTarget), I18n.get(Rez.Strings.CannedOkSub), "MSG_DEST", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.CannedDelay15), I18n.get(Rez.Strings.CannedDelay15Sub), "MSG_DEL15", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.CannedDelay30), I18n.get(Rez.Strings.CannedDelay30Sub), "MSG_DEL30", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.CannedNeedHelp), I18n.get(Rez.Strings.CannedNeedHelpSub), "MSG_HELP", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.CannedRadioCheck), I18n.get(Rez.Strings.CannedRadioCheckSub), "MSG_TEST", null));
     }
 }
 
@@ -28,7 +28,7 @@ class CustomTextPickerDelegate extends WatchUi.TextPickerDelegate {
             var chIdx = ContactManager.selectedChannelIdx;
             var ok = bleMgr.sendChannelText(chIdx, text);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(ok ? "Gesendet: " + text : "Nicht verbunden", null);
+            WatchUi.showToast(ok ? I18n.format(Rez.Strings.ToastSent, [ text ]) : I18n.get(Rez.Strings.ToastNotConnected), null);
         }
         return true;
     }
@@ -60,13 +60,13 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
 
         if (id.equals("MSG_POS")) {
             ok = bleMgr.sendCurrentPosition(chIdx);
-            textToSend = "Position";
+            textToSend = I18n.get(Rez.Strings.ToastPosition);
         } else {
             ok = bleMgr.sendChannelText(chIdx, textToSend);
         }
 
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
-        WatchUi.showToast(ok ? textToSend + " gesendet" : "Nicht verbunden", null);
+        WatchUi.showToast(ok ? I18n.format(Rez.Strings.ToastSent, [ textToSend ]) : I18n.get(Rez.Strings.ToastNotConnected), null);
     }
 
     function onBack() as Void {

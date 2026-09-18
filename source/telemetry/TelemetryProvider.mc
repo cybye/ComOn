@@ -24,20 +24,43 @@ class TelemetryProvider {
     }
 
     public function startTracking() as Void {
-        Position.enableLocationEvents(Position.LOCATION_CONTINUOUS, method(:onPosition));
+        try {
+            Position.enableLocationEvents(Position.LOCATION_CONTINUOUS, method(:onPosition));
+        } catch (e) {
+            System.println("TelemetryProvider: enableLocationEvents error: " + e.getErrorMessage());
+        }
+        refreshPosition();
     }
 
     public function stopTracking() as Void {
-        Position.enableLocationEvents(Position.LOCATION_DISABLE, null);
+        try {
+            Position.enableLocationEvents(Position.LOCATION_DISABLE, null);
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    public function refreshPosition() as Void {
+        try {
+            var info = Position.getInfo();
+            if (info != null && info.position != null) {
+                onPosition(info);
+            }
+        } catch (e) {
+            // ignore
+        }
     }
 
     public function onPosition(info as Position.Info) as Void {
-        if (info.position != null && info.accuracy != Position.QUALITY_NOT_AVAILABLE && info.accuracy != Position.QUALITY_LAST_KNOWN) {
+        if (info != null && info.position != null) {
             var rad = info.position.toRadians();
             currentLat = rad[0] * 180.0 / Math.PI;
             currentLon = rad[1] * 180.0 / Math.PI;
-            currentAlt = info.altitude;
+            if (info.altitude != null) {
+                currentAlt = info.altitude;
+            }
             hasGpsFix = true;
+            System.println("TelemetryProvider: GPS fix updated -> " + currentLat + ", " + currentLon + " (acc=" + info.accuracy + ")");
         } else {
             hasGpsFix = false;
         }

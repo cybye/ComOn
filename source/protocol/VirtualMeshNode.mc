@@ -1,8 +1,9 @@
 import Toybox.Lang;
 import Toybox.Time;
 import Toybox.System;
-import Toybox.Timer;
 import Toybox.StringUtil;
+import Toybox.Application.Storage;
+import Toybox.Timer;
 
 class VirtualMeshNode {
     private static var _instance as VirtualMeshNode? = null;
@@ -17,8 +18,8 @@ class VirtualMeshNode {
 
     private var _inbox as Array<Dictionary> = [] as Array<Dictionary>;
     private var _contacts as Array<Dictionary> = [] as Array<Dictionary>;
+    private var _channels as Array<Dictionary> = [] as Array<Dictionary>;
     private var _notifyCallback as Method?;
-    private var _echoTimer as Timer.Timer?;
 
     public static function getInstance() as VirtualMeshNode {
         if (_instance == null) {
@@ -30,6 +31,13 @@ class VirtualMeshNode {
     function initialize() {
         var now = Time.now().value();
         nodeTime = now;
+
+        // Default initial channels on the node
+        _channels = [
+            { :idx => 0, :name => "#public" },
+            { :idx => 1, :name => "#notruf" },
+            { :idx => 2, :name => "#team" }
+        ];
 
         // Default initial contacts on the node
         _contacts = [
@@ -59,6 +67,8 @@ class VirtualMeshNode {
             handleSendChannelMessage(bytes);
         } else if (cmd == MeshProtocol.CMD_SYNC_NEXT_MESSAGE) {
             handleSyncNextMessage();
+        } else if (cmd == MeshProtocol.CMD_GET_CHANNELS) {
+            handleGetChannels();
         } else if (cmd == MeshProtocol.CMD_GET_CONTACTS) {
             handleGetContacts(bytes);
         } else if (cmd == MeshProtocol.CMD_SET_DEVICE_TIME) {
@@ -117,6 +127,36 @@ class VirtualMeshNode {
             resp.add(MeshProtocol.RESP_CODE_OK);
             resp.add(0);
             deliverNotify(resp);
+        }
+    }
+
+    private function handleGetChannels() as Void {
+        // 1. Send RESP_CODE_CHANNELS_START
+        var frames = [] as Array;
+        frames.add([MeshProtocol.RESP_CODE_CHANNELS_START]);
+
+        // 2. Stream channels: RESP_CODE_CHANNEL (8) | channel_idx (1B) | name_len (1B) | name_bytes (NB)
+        for (var i = 0; i < _channels.size(); i++) {
+            var ch = _channels[i];
+            var chIdx = ch[:idx] as Number;
+            var nameBytes = (ch[:name] as String).toUtf8Array();
+            var frame = [
+                MeshProtocol.RESP_CODE_CHANNEL,
+                chIdx,
+                nameBytes.size()
+            ] as Array<Number>;
+            for (var nI = 0; nI < nameBytes.size(); nI++) {
+                frame.add(nameBytes[nI]);
+            }
+            frames.add(frame);
+        }
+
+        // 3. Send RESP_CODE_END_OF_CHANNELS
+        frames.add([MeshProtocol.RESP_CODE_END_OF_CHANNELS]);
+
+        // Deliver frames
+        for (var f = 0; f < frames.size(); f++) {
+            deliverNotify(frames[f]);
         }
     }
 
@@ -191,14 +231,35 @@ class VirtualMeshNode {
             deliverNotify(fullStr.toUtf8Array());
         } else {
             System.println("VirtualNode: Buffered offline message from " + sender);
+            try {
+                Storage.setValue("sim_pendingMsgCount", _inbox.size());
+                Storage.setValue("sim_lastPendingSender", sender);
+                Storage.setValue("sim_lastPendingMsg", text);
+            } catch (e) {
+                // ignore
+            }
         }
     }
 
     //! Fill inbox with 3 realistic messages to test catch-up sync
     public function fillInboxWithMissedMessages() as Void {
-        injectMessage("Florian", "Wegpunkt 3 erreicht. Weiter Richtung Grat.", 0);
-        injectMessage("Bergwacht", "Wetterbericht: Ab 15 Uhr Gewitterrisiko im Tal.", 1);
-        injectMessage("Basisstation", "Relais-Node Wendelstein aktiv auf Kanal 0.", 0);
+        var now = Time.now().value();
+        _inbox.add({ :sender => "Florian", :text => "Wegpunkt 3 erreicht. Weiter Richtung Grat.", :channelIdx => 0, :time => now - 300 });
+        _inbox.add({ :sender => "Bergwacht", :text => "Wetterbericht: Ab 15 Uhr Gewitterrisiko im Tal.", :channelIdx => 1, :time => now - 180 });
+        _inbox.add({ :sender => "Basisstation", :text => "Relais-Node Wendelstein aktiv auf Kanal 0.", :channelIdx => 0, :time => now - 60 });
+        System.println("VirtualNode: 3 messages buffered in offline inbox (total: " + _inbox.size() + ")");
+
+        try {
+            Storage.setValue("sim_pendingMsgCount", _inbox.size());
+            Storage.setValue("sim_lastPendingSender", "Florian");
+            Storage.setValue("sim_lastPendingMsg", "Wegpunkt 3 erreicht. Weiter Richtung Grat.");
+        } catch (e) {
+            // ignore
+        }
+
+        if (isBleConnected) {
+            deliverNotify([MeshProtocol.PUSH_CODE_MSG_WAITING]);
+        }
     }
 
     public function injectContact(name as String, id as String) as Void {
@@ -217,31 +278,58 @@ class VirtualMeshNode {
         return _inbox.size();
     }
 
-    private var _lastEchoText as String = "";
+    private var _echoTimer as Timer.Timer? = null;
+    private var _pendingEchoText as String = "";
+    private var _pendingEchoChannel as Number = 0;
 
     private function scheduleEchoReply(originalText as String, channelIdx as Number) as Void {
-        _lastEchoText = originalText;
-        _echoTimer = new Timer.Timer();
+        _pendingEchoText = (originalText.length() > 0) ? ("Echo: " + originalText) : "Empfang OK";
+        _pendingEchoChannel = channelIdx;
+
+        if (_echoTimer == null) {
+            _echoTimer = new Timer.Timer();
+        }
         _echoTimer.start(method(:onEchoTimerTrigger), 1200, false);
     }
 
     public function onEchoTimerTrigger() as Void {
-        // Vary RSSI (-74 to -82 dBm) and SNR (+6 to +9 dB) realistically per transmission
         var nowVal = Time.now().value();
         loraRssi = -74 - (nowVal % 9);
         loraSnr = 6 + ((nowVal / 2) % 4);
 
-        var replyText = (_lastEchoText.length() > 0) ? ("Echo: " + _lastEchoText) : "Empfang OK";
-        injectMessage("Echo", replyText, 0);
+        injectMessage("Echo", _pendingEchoText, _pendingEchoChannel);
     }
 
+    private var _deliveryQueue as Array<Array<Number>> = [] as Array<Array<Number>>;
+    private var _isDelivering as Boolean = false;
+
     private function deliverNotify(data as Array<Number>) as Void {
-        if (_notifyCallback != null && isBleConnected) {
+        if (_notifyCallback == null || !isBleConnected) {
+            return;
+        }
+
+        _deliveryQueue.add(data);
+
+        // If already delivering, return immediately to unwind the call stack!
+        if (_isDelivering) {
+            return;
+        }
+
+        _isDelivering = true;
+        while (_deliveryQueue.size() > 0 && isBleConnected) {
+            var item = _deliveryQueue[0];
+            var newQueue = [] as Array<Array<Number>>;
+            for (var i = 1; i < _deliveryQueue.size(); i++) {
+                newQueue.add(_deliveryQueue[i]);
+            }
+            _deliveryQueue = newQueue;
+
             try {
-                _notifyCallback.invoke(data);
+                _notifyCallback.invoke(item);
             } catch (e) {
                 System.println("VirtualNode notify error: " + e.getErrorMessage());
             }
         }
+        _isDelivering = false;
     }
 }

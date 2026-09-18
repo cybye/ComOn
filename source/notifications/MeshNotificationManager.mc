@@ -45,16 +45,16 @@ class MeshNotificationManager {
             :body => text,
             :dismissPrevious => true,
             :actions => [
-                { :label => "Chat öffnen", :data => "ACTION_CHAT" },
-                { :label => "Antworten", :data => "ACTION_REPLY" },
-                { :label => "Position senden", :data => "ACTION_SEND_POS" },
-                { :label => "Alles OK", :data => "ACTION_SEND_OK" }
+                { :label => I18n.get(Rez.Strings.NotifActionOpenChat), :data => "ACTION_CHAT" },
+                { :label => I18n.get(Rez.Strings.NotifActionReply), :data => "ACTION_REPLY" },
+                { :label => I18n.get(Rez.Strings.NotifActionPosition), :data => "ACTION_SEND_POS" },
+                { :label => I18n.get(Rez.Strings.NotifActionOk), :data => "ACTION_SEND_OK" }
             ] as Array<Notifications.Action>
         };
 
         System.println("MeshNotificationManager: showNotification called for " + sender + " - " + text);
         try {
-            Notifications.showNotification("Mesh: " + sender, "Eingehende Nachricht", options);
+            Notifications.showNotification(I18n.format(Rez.Strings.NotifSenderTitle, [ sender ]), I18n.get(Rez.Strings.NotifIncomingMsg), options);
             System.println("MeshNotificationManager: showNotification succeeded");
         } catch (e) {
             System.println("MeshNotificationManager: showNotification error: " + e.getErrorMessage());
@@ -83,7 +83,7 @@ class MeshNotificationManager {
             } else if (actionId.equals("ACTION_SEND_POS")) {
                 bleMgr.sendCurrentPosition(chIdx);
             } else if (actionId.equals("ACTION_SEND_OK")) {
-                bleMgr.sendChannelText(chIdx, "Alles OK");
+                bleMgr.sendChannelText(chIdx, I18n.get(Rez.Strings.CannedOk));
             }
         }
     }

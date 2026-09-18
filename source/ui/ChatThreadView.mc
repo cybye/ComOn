@@ -207,7 +207,7 @@ class ChatThreadView extends WatchUi.View {
         dc.drawRoundedRectangle(btnX, btnY, btnW, btnH, 10);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, btnY + (btnH / 2) - 2, fontXtiny, "Antworten", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, btnY + (btnH / 2) - 2, fontXtiny, I18n.get(Rez.Strings.ReplyTitle), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function wrapMessageText(dc as Graphics.Dc, text as String, font as Graphics.FontDefinition, maxWidth as Number) as Array<String> {

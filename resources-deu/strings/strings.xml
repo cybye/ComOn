@@ -1,0 +1,155 @@
+<strings>
+    <!-- App & Target Names -->
+    <string id="AppName">Mesh Companion</string>
+    <string id="DataFieldAppName">Mesh Companion Field</string>
+
+    <!-- Connection Statuses -->
+    <string id="StatusDisconnected">Getrennt</string>
+    <string id="StatusScanning">Suche Node...</string>
+    <string id="StatusSyncing">Sync mit Node...</string>
+    <string id="StatusConnected">Verbunden</string>
+
+    <!-- Chat & Readiness States -->
+    <string id="ReadyToReceive">Bereit zum Empfang</string>
+    <string id="NoMessages">Keine Nachrichten</string>
+    <string id="MessageLabel">Nachricht</string>
+    <string id="ActiveBadge">[Aktiv]</string>
+    <string id="NewBadge">[$1$ neu]</string>
+
+    <!-- Targets & Navigation -->
+    <string id="TargetSelectTitle">Ziel wählen</string>
+    <string id="TargetSelectedToast">Ziel: $1$</string>
+    <string id="TargetActiveToast">$1$ aktiv</string>
+    <string id="ChatsTitle">Chats</string>
+
+    <!-- Menus & Actions -->
+    <string id="MenuTitle">Mesh Companion</string>
+    <string id="MenuQuickReply">Antwort an $1$</string>
+    <string id="MenuQuickReplySub">Direktantwort / Tastatur</string>
+    <string id="MenuChats">Chats</string>
+    <string id="MenuActiveTarget">Aktiv: $1$</string>
+    <string id="MenuSendMsg">Nachricht senden</string>
+    <string id="MenuSendMsgSub">Aus Liste</string>
+    <string id="MenuSendPosition">Position senden</string>
+    <string id="MenuSendPositionSub">GPS + Vitaldaten</string>
+    <string id="MenuSos">SOS Notruf</string>
+    <string id="MenuSosSub">Notfall Broadcast</string>
+    <string id="MenuSettings">Einstellungen</string>
+    <string id="MenuSettingsSub">Tastatur, Node...</string>
+    <string id="MenuExit">App beenden</string>
+
+    <!-- Canned Quick Replies -->
+    <string id="ReplyTitle">Antworten</string>
+    <string id="MenuCustomMsg">Freitext schreiben...</string>
+    <string id="MenuCustomMsgSub">Tastatur</string>
+    <string id="CannedOk">Alles OK</string>
+    <string id="CannedOkSub">Status</string>
+    <string id="CannedAtTarget">Am Treffpunkt</string>
+    <string id="CannedDelay15">Verzögerung 15 min</string>
+    <string id="CannedDelay15Sub">Zeit</string>
+    <string id="CannedDelay30">Verzögerung 30 min</string>
+    <string id="CannedDelay30Sub">Zeit</string>
+    <string id="CannedNeedHelp">Brauche Hilfe</string>
+    <string id="CannedNeedHelpSub">Dringend</string>
+    <string id="CannedRadioCheck">Funktest</string>
+    <string id="CannedRadioCheckSub">Test</string>
+
+    <!-- Toast Feedback -->
+    <string id="ToastSent">$1$ gesendet</string>
+    <string id="ToastPositionSent">Position gesendet</string>
+    <string id="ToastNotConnected">Nicht verbunden</string>
+    <string id="ToastPosition">Position</string>
+
+    <!-- Message Actions (Tapping Card) -->
+    <string id="ActionReplyKeyboard">Antworten (Tastatur)</string>
+    <string id="ActionReplyKeyboardSub">Freitext schreiben</string>
+    <string id="ActionReplyCanned">Schnellantwort</string>
+    <string id="ActionReplyCannedSub">Aus Liste wählen</string>
+    <string id="ActionSendLocation">Standort senden</string>
+    <string id="ActionSendLocationSub">GPS zurücksenden</string>
+    <string id="ActionDirectMsg">1:1 Direktnachricht</string>
+    <string id="ActionDirectMsgSub">Ziel auf $1$ setzen</string>
+
+    <!-- Settings -->
+    <string id="SettingsTitle">Einstellungen</string>
+    <string id="SettingKeyboardType">Tastatur-Typ</string>
+    <string id="SettingBgCheck">Hintergrund-Prüfung</string>
+    <string id="SettingBgCheckSub">$1$ min</string>
+    <string id="SettingBgDisabled">Aus</string>
+    <string id="SettingWardriving">Wardriving FIT-Log</string>
+    <string id="SettingEnabled">AN</string>
+    <string id="SettingDisabled">AUS</string>
+    <string id="SettingActiveOn">Aktiv (AN)</string>
+    <string id="SettingInactiveOff">Inaktiv (AUS)</string>
+    <string id="SettingInterval5Min">5 Min (Standard)</string>
+    <string id="SettingInterval15Min">15 Min</string>
+    <string id="SettingInterval30Min">30 Min</string>
+    <string id="SettingInterval1Hour">1 Stunde</string>
+    <string id="SettingIntervalDisabled">Aus / Deaktiviert</string>
+    <string id="SettingTelemetryFmt">Telemetrie-Format</string>
+    <string id="SettingFmtBinary">Kompakt-Binär</string>
+    <string id="SettingFmtText">Chat-Text</string>
+    <string id="SettingPairNode">Node koppeln</string>
+    <string id="SettingPairNodeSub">Bluetooth Suche</string>
+    <string id="SettingVirtualNode">Virtueller Node Sim</string>
+    <string id="SettingVirtualNodeSub">Test-Bench</string>
+    <string id="SettingSyncNode">Node neu synchronisieren</string>
+    <string id="SettingSyncNodeSub">Kanäle &amp; Kontakte neu laden</string>
+    <string id="SettingReleaseNode">Node freigeben (BLE)</string>
+    <string id="SettingReleaseNodeSub">Verbindung für Smartphone trennen</string>
+    <string id="ToastSyncStarted">Synchronisiere mit Node...</string>
+    <string id="ToastSyncComplete">Sync abgeschlossen ($1$ Kontakte, $2$ Kanäle)</string>
+    <string id="ToastNodeReleased">Node freigegeben (BLE pausiert)</string>
+
+    <!-- Notifications -->
+    <string id="NotifTitle">Mesh Companion</string>
+    <string id="NotifSenderTitle">Mesh: $1$</string>
+    <string id="NotifIncomingMsg">Eingehende Nachricht</string>
+    <string id="NotifActionOpenChat">Chat öffnen</string>
+    <string id="NotifActionReply">Antworten</string>
+    <string id="NotifActionPosition">Position senden</string>
+    <string id="NotifActionOk">Alles OK</string>
+    <string id="NotifActionDismiss">Schließen</string>
+
+    <!-- Data Field & Telemetry -->
+    <string id="DataFieldMenuTitle">Mesh Telemetrie</string>
+    <string id="TelemetryReady">Bereit ($1$s)</string>
+    <string id="TelemetrySent">Gesendet an $1$ ($2$s)</string>
+    <string id="TelemetryStationary"> [STAT]</string>
+    <string id="TelemetryOff">Offline</string>
+    <string id="TelemetryOk">OK</string>
+    <string id="TelemetryNodesSuffix">Nodes</string>
+    <string id="TelemetryTitle">TELEMETRIE</string>
+    <string id="SensorHeartRate">HRF</string>
+    <string id="SensorCadence">TRITT</string>
+    <string id="SensorPower">LEISTUNG</string>
+    <string id="SensorPressure">DRUCK</string>
+    <string id="SensorSteps">SCHRITTE</string>
+    <string id="SensorBattery">BATT</string>
+    <string id="GpsFixOk">FIX OK</string>
+    <string id="GpsSearching">SUCHE...</string>
+
+    <!-- FIT Contributions -->
+    <string id="FitRssiChart">LoRa RSSI</string>
+    <string id="FitRssiLabel">LoRa RSSI</string>
+    <string id="FitRssiUnit">dBm</string>
+    <string id="FitSnrChart">LoRa SNR</string>
+    <string id="FitSnrLabel">LoRa SNR</string>
+    <string id="FitSnrUnit">dB</string>
+    <string id="FitPeersChart">Mesh Nodes</string>
+    <string id="FitPeersLabel">Peers</string>
+    <string id="FitPeersUnit">nodes</string>
+    <string id="FitBatChart">Node Akku</string>
+    <string id="FitBatLabel">Node Akku</string>
+    <string id="FitBatUnit">%</string>
+
+    <!-- SOS View -->
+    <string id="SosHeader">SOS NOTRUF</string>
+    <string id="SosSentTitle">SOS GESENDET</string>
+    <string id="SosCardTelemetry">NOTFALL-TELEMETRIE</string>
+    <string id="SosCardGpsWaiting">Warte auf GPS-Fix...</string>
+    <string id="SosCardChannel">Kanal 0 (Broadcast)</string>
+    <string id="SosCardBeacon">Wiederholung in $1$s</string>
+    <string id="SosBackCancel">BACK: Abbrechen</string>
+    <string id="SosBackClose">BACK: Schließen</string>
+</strings>

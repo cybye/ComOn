@@ -1,1 +1,2 @@
 project.manifest = manifest.xml
+base.sourcePath = source/ble;source/protocol;source/telemetry;source/ui;source/notifications;source/background;source/util;source/MeshCoreApp.mc
