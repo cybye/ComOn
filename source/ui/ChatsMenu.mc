@@ -97,6 +97,7 @@ class ChatsDelegate extends WatchUi.Menu2InputDelegate {
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
         var label = item.getLabel();
+        System.println("ChatsDelegate: onSelect " + id + " (" + label + ")");
 
         if (id.find("CH_") == 0) {
             var chIdx = id.substring(3, id.length()).toNumber();
@@ -112,6 +113,7 @@ class ChatsDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onBack() as Void {
+        System.println("ChatsDelegate: onBack");
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }

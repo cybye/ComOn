@@ -358,6 +358,12 @@ POS: <LAT>,<LON> | <ALT> | HF:<HR> | <SPEED> [STAT]
   2. *Seite 1 (Telemetrie & Sensoren)*: Erreichbar über `DOWN` (7 Uhr). Taste `START` sendet sofort den aktuellen GPS-Fix und Vitaldaten via LoRa (`sendPositionDirect()`). Damit entfällt der Menüpunkt "Position senden" im Hauptmenü vollständig (2 Klicks: `DOWN` + `START`).
   3. *Seite 2 (SOS Notruf Prompt)*: Erreichbar über erneutes `DOWN` von Seite 1. Verwendet das **1:1 identische visuelle Layout wie der spätere Notruf-Modus** (Header bei $y=72$, Notfall-Telemetriekarte bei $y=120$ mit Live-GPS, Vitaldaten und Kanal 0 sowie Aktions-Prompt `START: Notruf starten` in der AMOLED-Safezone bei $y=\text{height}-68$). Taste `START` (2 Uhr) oder Touch-Tap löst direkt die 5-Sekunden-Notrufsequenz (`SosView`) aus.
   4. *Hauptmenü-Verschlankung*: Das Hauptmenü (`openMainMenu()`) wurde auf 4 Kernpunkte reduziert (Chats, SOS Notruf, Einstellungen, Beenden), wodurch die Menühöhe sinkt und versehentliche Fehlauswahlen unter Stress vermieden werden.
+* **ADR 13: BLE-Resilienz & Exception-Defense (`DeviceAlreadyPairedException`):**
+  Die Garmin Connect IQ BLE-Laufzeitumgebung wirft eine fatale, unbehandelte Ausnahme (`Device Already Paired`), wenn `BluetoothLowEnergy.pairDevice()` auf ein Peripheriegerät aufgerufen wird, das im Betriebssystem bereits gekoppelt ist. Unbehandelte Ausnahmen in asynchronen BLE-Callbacks führen im Connect IQ Simulator und auf der physischen Uhr zum sofortigen Stillstand des Interpreters, wodurch der Bildschirm einfriert und keine Tasten- oder Touchevents mehr verarbeitet werden.
+  Zur Vermeidung dieses Stillstands implementiert `MeshBleManager`:
+  1. *Defensives Exception-Handling*: Aufrufe von `pairDevice()` sowie `setScanState()` werden in strikte `try-catch`-Blöcke gekapselt.
+  2. *Automatischer Fallback auf getPairedDevices*: Fängt `procScanResults()` den Fehler `Device Already Paired` ab, wird das bereits gekoppelte Gerät über `BluetoothLowEnergy.getPairedDevices()` bezogen und der Verbindungszustand via `procConnectedStateChanged(_device, CONNECTION_STATE_CONNECTED)` unmittelbar und ohne Verbindungsverlust wiederhergestellt.
+  3. *Zero UI Freeze*: Sämtliche Menü-Delegates (`MainMenuDelegate`, `ChatsDelegate`, `SettingsDelegate`) bleiben unterbrechungsfrei interaktiv und reaktionsfähig.
 
 ---
 

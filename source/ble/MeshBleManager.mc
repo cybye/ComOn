@@ -98,7 +98,12 @@ class MeshBleManager {
         }
         if (!isScanning && !isConnected) {
             isScanning = true;
-            BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
+            try {
+                BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
+            } catch (e) {
+                System.println("setScanState notice: " + e.getErrorMessage());
+                isScanning = false;
+            }
         }
     }
 
@@ -140,25 +145,51 @@ class MeshBleManager {
     public function stopScan() as Void {
         if (isScanning) {
             isScanning = false;
-            BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_OFF);
+            try {
+                BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_OFF);
+            } catch (e) {
+                System.println("setScanState off notice: " + e.getErrorMessage());
+            }
         }
     }
 
     public function procScanResults(scanResults as BluetoothLowEnergy.Iterator) as Void {
-        for (var result = scanResults.next(); result != null; result = scanResults.next()) {
-            var res = result as BluetoothLowEnergy.ScanResult;
-            var iter = res.getServiceUuids();
-            for (var u = iter.next(); u != null; u = iter.next()) {
-                if (nusServiceUuid != null && u.equals(nusServiceUuid)) {
-                    stopScan();
-                    var name = res.getDeviceName();
-                    if (name != null) {
-                        deviceName = name;
+        try {
+            for (var result = scanResults.next(); result != null; result = scanResults.next()) {
+                var res = result as BluetoothLowEnergy.ScanResult;
+                var iter = res.getServiceUuids();
+                for (var u = iter.next(); u != null; u = iter.next()) {
+                    if (nusServiceUuid != null && u.equals(nusServiceUuid)) {
+                        stopScan();
+                        var name = res.getDeviceName();
+                        if (name != null) {
+                            deviceName = name;
+                        }
+                        try {
+                            var dev = BluetoothLowEnergy.pairDevice(res);
+                            if (dev != null) {
+                                _device = dev;
+                            }
+                        } catch (e) {
+                            System.println("BLE pairDevice notice: " + e.getErrorMessage());
+                            // If already paired, retrieve device from getPairedDevices
+                            var pairedIter = BluetoothLowEnergy.getPairedDevices();
+                            if (pairedIter != null) {
+                                for (var p = pairedIter.next(); p != null; p = pairedIter.next()) {
+                                    _device = p as BluetoothLowEnergy.Device;
+                                    break;
+                                }
+                            }
+                            if (_device != null) {
+                                procConnectedStateChanged(_device, BluetoothLowEnergy.CONNECTION_STATE_CONNECTED);
+                            }
+                        }
+                        return;
                     }
-                    BluetoothLowEnergy.pairDevice(res);
-                    return;
                 }
             }
+        } catch (outerEx) {
+            System.println("procScanResults outer notice: " + outerEx.getErrorMessage());
         }
     }
 

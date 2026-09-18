@@ -190,6 +190,7 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
+        System.println("MainMenuDelegate: onSelect " + id);
         var bleMgr = getBleManager();
         var chIdx = ContactManager.selectedChannelIdx;
 
@@ -218,6 +219,7 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onBack() as Void {
+        System.println("MainMenuDelegate: onBack");
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }
