@@ -4,6 +4,7 @@ import Toybox.System;
 import Toybox.StringUtil;
 import Toybox.Application.Storage;
 import Toybox.WatchUi;
+import Toybox.Timer;
 
 class MeshBleManager {
     public var nusServiceUuid as BluetoothLowEnergy.Uuid?;
@@ -35,6 +36,7 @@ class MeshBleManager {
     private var _isFullSync as Boolean = false;
     private var _spoolQueue as Array<Dictionary> = [] as Array<Dictionary>;
     private var _pauseScanUntil as Number = 0;
+    private var _syncTimeoutTimer as Timer.Timer? = null;
 
     public function forceFullSync() as Void {
         _isFullSync = true;
@@ -212,6 +214,9 @@ class MeshBleManager {
 
             startSessionSync();
         } else {
+            if (_syncTimeoutTimer != null) {
+                _syncTimeoutTimer.stop();
+            }
             isConnected = false;
             isSyncing = false;
             _syncStage = 0;
@@ -238,9 +243,21 @@ class MeshBleManager {
             ContactManager.startFullSync();
         }
 
+        if (_syncTimeoutTimer == null) {
+            _syncTimeoutTimer = new Timer.Timer();
+        }
+        _syncTimeoutTimer.start(method(:onSyncTimeout), 8000, false);
+
         sendRaw(MeshProtocol.encodeSyncNextMessage());
         if (WatchUi has :requestUpdate) {
             WatchUi.requestUpdate();
+        }
+    }
+
+    public function onSyncTimeout() as Void {
+        if (isSyncing) {
+            System.println("BLE Sync timeout: Node did not complete all stages within 8s -> finalizing sync");
+            finishSessionSync();
         }
     }
 
@@ -434,6 +451,9 @@ class MeshBleManager {
     }
 
     private function finishSessionSync() as Void {
+        if (_syncTimeoutTimer != null) {
+            _syncTimeoutTimer.stop();
+        }
         if (_isFullSync) {
             ContactManager.commitFullSync();
             _isFullSync = false;
