@@ -77,9 +77,17 @@ Der Hauptbildschirm umfasst **3 Seiten**, die intuitiv über die Hardware-Tasten
 * **Navigations-Indikatoren:** Dreiecke oben (UP) und unten (DOWN).
 
 #### Seite 2: SOS Notruf Prompt (`pageIndex == 2`)
-* **Taste START (2 Uhr) / Tap auf Notruf-Karte:** Startet **sofort die Notruf-Sequenz** (`SosView`).
+* **Taste START (2 Uhr) / Tap auf Notruf-Karte:** Startet **sofort die Notruf-Sequenz** (`SosView` mit 5s Countdown).
 * **Taste UP (9 Uhr) / Taste BACK (4 Uhr) / Wisch nach rechts:** Zurück zu **Seite 1 (Telemetrie)**.
-* **Anzeige:** Rote Notruf-Karte mit pulsendem "SOS"-Symbol, Notfallkanal 0, Hinweisen auf GPS + Vitaldaten + 60s Auto-Beacon.
+* **Anzeige (1:1 identisches Layout wie im späteren Notruf-Modus):**
+  * **Header:** `SOS NOTRUF` bei `y = 72` (`FONT_SYSTEM_TINY`, Rot).
+  * **Notfall-Telemetriekarte (`cardY = 120`, `cardH = 196`):**
+    * Titel `NOTFALL-TELEMETRIE` in Rot.
+    * Zeile 1: Live-GPS-Koordinaten (Gelb) oder `Warte auf GPS-Fix...`.
+    * Zeile 2: Vitaldaten & Höhe (`245m | 72 bpm | 1420 Stp`).
+    * Zeile 3: `Kanal 0 (Broadcast)` in Hellgrau.
+    * Zeile 4: `* 60s Auto-Beacon bei Alarm` in Grün.
+  * **Aktions-Hinweis (unten bei `height - 68`):** `START: Notruf starten` zentriert in der AMOLED-Safezone.
 * **Optisches Highlight:** Roter Akzentbogen bei 2 Uhr (`Graphics.COLOR_RED`, 4px Strichstärke).
 * **Navigations-Indikator:** Nach oben zeigendes Dreieck am oberen Rand.
 

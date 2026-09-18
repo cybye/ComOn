@@ -307,7 +307,7 @@ class DashboardView extends WatchUi.View {
     }
 
     // -----------------------------------------------------------------
-    // SCREEN 3: SOS NOTRUF SEITE (Page 2)
+    // SCREEN 3: SOS NOTRUF SEITE (Page 2 - Identisches Layout wie Notruf-Modus)
     // -----------------------------------------------------------------
     private function drawSosPage(dc as Graphics.Dc) as Void {
         var w = dc.getWidth();
@@ -317,43 +317,59 @@ class DashboardView extends WatchUi.View {
 
         var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
         var fontTiny  = Graphics.FONT_SYSTEM_TINY;
-        var fontSmall = Graphics.FONT_SYSTEM_SMALL;
 
-        // Top Header
+        // Header (matching SosView at y = 72)
         dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 48, fontTiny, I18n.get(Rez.Strings.SosHeader), Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, 72, fontTiny, I18n.get(Rez.Strings.SosHeader), Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Emergency Action Card
+        // Telemetry Card (matching SosView layout)
         var cardW = w - 84;
-        var cardH = 200;
         var cardX = (w - cardW) / 2;
-        var cardY = 105;
+        var cardY = 120;
+        var cardH = 196;
         var cardR = 14;
 
-        dc.setColor(0x220808, Graphics.COLOR_BLACK);
+        // Card background & border
+        dc.setColor(0x180808, Graphics.COLOR_BLACK);
         dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, cardR);
         dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
         dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, cardR);
         dc.setPenWidth(1);
 
-        // Glowing red circle with "SOS" text
-        var iconY = cardY + 54;
+        // Card Header
         dc.setColor(Graphics.COLOR_RED, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(cx, iconY, 26);
+        dc.drawText(cx, cardY + 14, fontXtiny, I18n.get(Rez.Strings.SosCardTelemetry), Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Row 1: GPS Position (centered)
+        var telem = TelemetryProvider.getInstance();
+        telem.refreshPosition();
+        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+        var posText = (telem.hasGpsFix && telem.currentLat != null && telem.currentLon != null) 
+            ? (telem.currentLat.format("%.4f") + "°, " + telem.currentLon.format("%.4f") + "°") 
+            : I18n.get(Rez.Strings.SosCardGpsWaiting);
+        dc.drawText(cx, cardY + 52, fontXtiny, posText, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Row 2: Vitals & Alt (centered)
+        var altStr = (telem.currentAlt != null) ? (telem.currentAlt.format("%.0f") + "m") : "--m";
+        var hr = telem.getHeartRate();
+        var hrStr = (hr != null) ? (hr.toString() + " bpm") : "-- bpm";
+        var stp = telem.getSteps();
+        var stpStr = (stp != null) ? (stp.toString() + " Stp") : "0 Stp";
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, iconY - 14, fontSmall, "SOS", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, cardY + 86, fontXtiny, altStr + "  |  " + hrStr + "  |  " + stpStr, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Action title
+        // Row 3: Channel (centered)
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cardY + 120, fontXtiny, I18n.get(Rez.Strings.SosCardChannel), Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Row 4: Auto-Beacon indicator
+        dc.setColor(0x00FF88, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, cardY + 152, fontXtiny, "* " + I18n.get(Rez.Strings.SosCardAutoBeacon), Graphics.TEXT_JUSTIFY_CENTER);
+
+        // Bottom action hint (matching SosView safe-zone at height - 68)
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 98, fontTiny, "START: NOTRUF STARTEN", Graphics.TEXT_JUSTIFY_CENTER);
-
-        // Details
-        dc.setColor(0xcccccc, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 132, fontXtiny, I18n.get(Rez.Strings.SosCardChannel), Graphics.TEXT_JUSTIFY_CENTER);
-
-        dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, cardY + 158, fontXtiny, "GPS + Vitaldaten + 60s Auto-Beacon", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, h - 68, fontXtiny, I18n.get(Rez.Strings.SosStartPrompt), Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     // -----------------------------------------------------------------

@@ -150,6 +150,8 @@
     <string id="SosCardGpsWaiting">Warte auf GPS-Fix...</string>
     <string id="SosCardChannel">Kanal 0 (Broadcast)</string>
     <string id="SosCardBeacon">Wiederholung in $1$s</string>
+    <string id="SosCardAutoBeacon">60s Auto-Beacon bei Alarm</string>
+    <string id="SosStartPrompt">START: Notruf starten</string>
     <string id="SosBackCancel">BACK: Abbrechen</string>
     <string id="SosBackClose">BACK: Schließen</string>
 </strings>

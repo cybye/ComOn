@@ -356,7 +356,7 @@ POS: <LAT>,<LON> | <ALT> | HF:<HR> | <SPEED> [STAT]
   Zur Steigerung der Bedienungseffizienz und Ergonomie bei Outdoor-Aktivitäten mit Handschuhen wurde die Navigation auf ein 3-Seiten-Modell aufgeteilt:
   1. *Seite 0 (Chat & Dashboard)*: Fokus auf Kommunikation. Taste `START` (2 Uhr) öffnet direkt den aktiven Chat-Verlauf (`ChatThreadView`) in genau 1 Klick. Taste `MENU` (9 Uhr) öffnet das Hauptmenü.
   2. *Seite 1 (Telemetrie & Sensoren)*: Erreichbar über `DOWN` (7 Uhr). Taste `START` sendet sofort den aktuellen GPS-Fix und Vitaldaten via LoRa (`sendPositionDirect()`). Damit entfällt der Menüpunkt "Position senden" im Hauptmenü vollständig (2 Klicks: `DOWN` + `START`).
-  3. *Seite 2 (SOS Notruf Prompt)*: Erreichbar über erneutes `DOWN` von Seite 1. Zeigt eine visuelle Notfall-Aktionskarte mit rotem 2-Uhr-Akzentbogen (`COLOR_RED`). `START` (2 Uhr) oder Touch-Tap löst direkt die 5-Sekunden-Notrufsequenz (`SosView`) aus.
+  3. *Seite 2 (SOS Notruf Prompt)*: Erreichbar über erneutes `DOWN` von Seite 1. Verwendet das **1:1 identische visuelle Layout wie der spätere Notruf-Modus** (Header bei $y=72$, Notfall-Telemetriekarte bei $y=120$ mit Live-GPS, Vitaldaten und Kanal 0 sowie Aktions-Prompt `START: Notruf starten` in der AMOLED-Safezone bei $y=\text{height}-68$). Taste `START` (2 Uhr) oder Touch-Tap löst direkt die 5-Sekunden-Notrufsequenz (`SosView`) aus.
   4. *Hauptmenü-Verschlankung*: Das Hauptmenü (`openMainMenu()`) wurde auf 4 Kernpunkte reduziert (Chats, SOS Notruf, Einstellungen, Beenden), wodurch die Menühöhe sinkt und versehentliche Fehlauswahlen unter Stress vermieden werden.
 
 ---

@@ -121,8 +121,8 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         } else if (_view.pageIndex == 2) {
             var coords = clickEvent.getCoordinates();
             var ty = coords[1];
-            // SOS Card bounds: ty = 100..310 -> Launch SOS
-            if (ty >= 100 && ty <= 310) {
+            // SOS Card & Prompt bounds: ty = 100..410 -> Launch SOS
+            if (ty >= 100 && ty <= 410) {
                 var sos = new SosView();
                 WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
                 return true;
