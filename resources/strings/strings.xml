@@ -150,7 +150,7 @@
     <string id="SosCardGpsWaiting">Waiting for GPS fix...</string>
     <string id="SosCardChannel">Channel 0 (Broadcast)</string>
     <string id="SosCardBeacon">Repeat in $1$s</string>
-    <string id="SosCardAutoBeacon">60s auto-beacon on alarm</string>
+    <string id="SosCardAutoBeacon">60s Auto-Beacon</string>
     <string id="SosStartPrompt">START: Send SOS</string>
     <string id="SosBackCancel">BACK: Cancel</string>
     <string id="SosBackClose">BACK: Close</string>

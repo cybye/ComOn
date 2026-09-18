@@ -86,7 +86,7 @@ Der Hauptbildschirm umfasst **3 Seiten**, die intuitiv über die Hardware-Tasten
     * Zeile 1: Live-GPS-Koordinaten (Gelb) oder `Warte auf GPS-Fix...`.
     * Zeile 2: Vitaldaten & Höhe (`245m | 72 bpm | 1420 Stp`).
     * Zeile 3: `Kanal 0 (Broadcast)` in Hellgrau.
-    * Zeile 4: `* 60s Auto-Beacon bei Alarm` in Grün.
+    * Zeile 4: `* 60s Auto-Beacon` in Grün.
   * **Aktions-Hinweis (unten bei `height - 68`):** `START: Notruf starten` zentriert in der AMOLED-Safezone.
 * **Optisches Highlight:** Roter Akzentbogen bei 2 Uhr (`Graphics.COLOR_RED`, 4px Strichstärke).
 * **Navigations-Indikator:** Nach oben zeigendes Dreieck am oberen Rand.
