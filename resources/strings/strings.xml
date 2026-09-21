@@ -1,17 +1,22 @@
 <strings>
     <!-- App & Target Names -->
-    <string id="AppName">Mesh Companion</string>
-    <string id="DataFieldAppName">Mesh Companion Field</string>
+    <string id="AppName">ComOn</string>
+    <string id="DataFieldAppName">ComOnDatafield</string>
 
     <!-- Connection Statuses -->
     <string id="StatusDisconnected">Disconnected</string>
     <string id="StatusScanning">Searching Node...</string>
     <string id="StatusSyncing">Syncing with Node...</string>
+        <string id="StatusConnecting">Connecting to node...</string>
     <string id="StatusConnected">Connected</string>
 
     <!-- Chat & Readiness States -->
     <string id="ReadyToReceive">Ready to receive</string>
     <string id="NoMessages">No messages</string>
+    <string id="SenderMe">You</string>
+    <string id="TimeJustNow">now</string>
+    <string id="PromptPressStartToWrite">Press START to write</string>
+    <string id="PromptPressMenuForOptions">Press MENU for options</string>
     <string id="MessageLabel">Message</string>
     <string id="ActiveBadge">[Active]</string>
     <string id="NewBadge">[$1$ new]</string>
@@ -21,9 +26,12 @@
     <string id="TargetSelectedToast">Target: $1$</string>
     <string id="TargetActiveToast">$1$ active</string>
     <string id="ChatsTitle">Chats</string>
+    <string id="ActionNewChat">+ New Chat</string>
+    <string id="ActionNewChatSub">$1$ contacts</string>
+    <string id="MoreContacts">+ $1$ more...</string>
 
     <!-- Menus & Actions -->
-    <string id="MenuTitle">Mesh Companion</string>
+    <string id="MenuTitle">ComOn</string>
     <string id="MenuQuickReply">Reply to $1$</string>
     <string id="MenuQuickReplySub">Direct reply / Keyboard</string>
     <string id="MenuChats">Chats</string>
@@ -37,6 +45,7 @@
     <string id="MenuSettings">Settings</string>
     <string id="MenuSettingsSub">Keyboard, Node...</string>
     <string id="MenuExit">Exit App</string>
+    <string id="NoChats">No chats found</string>
 
     <!-- Canned Quick Replies -->
     <string id="ReplyTitle">Reply</string>
@@ -90,6 +99,8 @@
     <string id="SettingTelemetryFmt">Telemetry Format</string>
     <string id="SettingFmtBinary">Compact Binary</string>
     <string id="SettingFmtText">Chat Text</string>
+    <string id="SettingNodeMenu">Node &amp; Data</string>
+    <string id="SettingNodeMenuSub">BLE, sync and cache</string>
     <string id="SettingPairNode">Pair Node</string>
     <string id="SettingPairNodeSub">Bluetooth scan</string>
     <string id="SettingVirtualNode">Virtual Node Sim</string>
@@ -98,15 +109,20 @@
     <string id="SettingSyncNodeSub">Reload channels &amp; contacts</string>
     <string id="SettingReleaseNode">Release Node (BLE)</string>
     <string id="SettingReleaseNodeSub">Disconnect for phone app</string>
+    <string id="SettingClearCache">Clear Cache &amp; History</string>
+    <string id="SettingClearCacheSub">Delete messages &amp; contacts</string>
     <string id="ToastSyncStarted">Syncing with Node...</string>
     <string id="ToastSyncComplete">Sync complete ($1$ contacts, $2$ channels)</string>
     <string id="ToastNodeReleased">Node released (BLE paused)</string>
+    <string id="ToastCacheCleared">History and cache cleared</string>
 
     <!-- Notifications -->
-    <string id="NotifTitle">Mesh Companion</string>
+    <string id="NotifTitle">ComOn</string>
     <string id="NotifSenderTitle">Mesh: $1$</string>
     <string id="NotifIncomingMsg">Incoming message</string>
+    <string id="NotifIncomingBatch">$1$s new messages</string>
     <string id="NotifActionOpenChat">Open Chat</string>
+    <string id="NotifActionOpenChats">Open Chats</string>
     <string id="NotifActionReply">Reply</string>
     <string id="NotifActionPosition">Send position</string>
     <string id="NotifActionOk">All OK</string>

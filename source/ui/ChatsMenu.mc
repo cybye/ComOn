@@ -1,9 +1,9 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-class ChatsMenu extends WatchUi.Menu2 {
-    function initialize() {
-        Menu2.initialize({ :title => I18n.get(Rez.Strings.ChatsTitle) });
+class ChatsMenu {
+    public static function create() as WatchUi.Menu2 {
+        var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.ChatsTitle) });
 
         var activeBadge = I18n.get(Rez.Strings.ActiveBadge);
         var activeItem = null;
@@ -44,8 +44,8 @@ class ChatsMenu extends WatchUi.Menu2 {
             }
         }
 
-        // 2. Direct Contacts (1:1 DMs)
-        var contacts = ContactManager.getContacts();
+        // 2. Direct Contacts (only active chats with history or active selection)
+        var contacts = ContactManager.getClientContacts();
         for (var j = 0; j < contacts.size(); j++) {
             var c = contacts[j];
             var cid = c[:id] as String;
@@ -53,6 +53,13 @@ class ChatsMenu extends WatchUi.Menu2 {
             var tid = "CT_" + cid;
 
             var isActive = (ContactManager.isContactTarget && ContactManager.selectedContactId != null && ContactManager.selectedContactId.equals(cid));
+            var hasMsgs = ChatHistoryManager.hasMessagesForTarget(tid);
+
+            // Only instantiate menu items for contacts with active conversations
+            if (!isActive && !hasMsgs) {
+                continue;
+            }
+
             var unread = ChatHistoryManager.getUnreadCountForTarget(tid);
             var lastMsg = ChatHistoryManager.getLastMessageForTarget(tid);
 
@@ -79,13 +86,25 @@ class ChatsMenu extends WatchUi.Menu2 {
             }
         }
 
+        // Add action item to select from all client contacts if desired
+        var clientCount = ContactManager.getClientContactsCount();
+        if (clientCount > 0) {
+            var subText = I18n.format(Rez.Strings.ActionNewChatSub, [ clientCount ]);
+            otherItems.add(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionNewChat), subText, "OPEN_CONTACTS_PICKER", null));
+        }
+
         // Active chat is placed first at the top
         if (activeItem != null) {
-            addItem(activeItem);
+            menu.addItem(activeItem);
         }
         for (var k = 0; k < otherItems.size(); k++) {
-            addItem(otherItems[k]);
+            menu.addItem(otherItems[k]);
         }
+        if (activeItem == null && otherItems.size() == 0) {
+            menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.NoChats), null, "NO_CHATS", null));
+        }
+
+        return menu;
     }
 }
 
@@ -94,26 +113,24 @@ class ChatsDelegate extends WatchUi.Menu2InputDelegate {
         Menu2InputDelegate.initialize();
     }
 
-    function onSelect(item as WatchUi.MenuItem) as Void {
+    public function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
         var label = item.getLabel();
-        System.println("ChatsDelegate: onSelect " + id + " (" + label + ")");
-
-        if (id.find("CH_") == 0) {
-            var chIdx = id.substring(3, id.length()).toNumber();
-            ContactManager.selectChannel(chIdx, label);
+        if (id.equals("NO_CHATS")) {
+            return;
+        } else if (id.equals("OPEN_CONTACTS_PICKER")) {
+            WatchUi.pushView(TargetSelectMenu.create(), new TargetSelectDelegate(), WatchUi.SLIDE_LEFT);
+            return;
+        } else if (id.find("CH_") == 0) {
+            ContactManager.selectChannel(id.substring(3, id.length()).toNumber(), label);
         } else if (id.find("CT_") == 0) {
-            var ctId = id.substring(3, id.length());
-            ContactManager.selectContact(ctId, label);
+            ContactManager.selectContact(id.substring(3, id.length()), label);
         }
-
-        // Open graphical Chat-Thread View
         var view = new ChatThreadView(id, label);
         WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
     }
 
-    function onBack() as Void {
-        System.println("ChatsDelegate: onBack");
+    public function onBack() as Void {
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }

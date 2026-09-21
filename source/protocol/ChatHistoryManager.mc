@@ -9,6 +9,10 @@ class ChatHistoryManager {
     private static var _messages as Array<Dictionary> = [] as Array<Dictionary>;
     private static var _initialized as Boolean = false;
 
+    public static const STATUS_QUEUED as Number         = 0; // Waiting in spool or awaiting node response
+    public static const STATUS_SENT_NODE as Number      = 1; // Node acknowledged receipt via BLE (Single check ✓)
+    public static const STATUS_CONFIRMED_MESH as Number = 2; // Node confirmed radio mesh broadcast via LoRa (Double check ✓✓)
+
     public static function initializeHistory() as Void {
         if (_initialized) {
             return;
@@ -22,13 +26,21 @@ class ChatHistoryManager {
                 var loaded = [] as Array<Dictionary>;
                 for (var i = 0; i < list.size(); i++) {
                     var it = list[i];
+                    var isOut = (it["isOutgoing"] != null) ? (it["isOutgoing"] as Boolean) : false;
+                    var storedRead = it["isRead"];
+                    var isRead = (storedRead instanceof Boolean) ? (storedRead as Boolean) : isOut;
+                    var st = it["status"];
+                    if (st == null) {
+                        st = isOut ? STATUS_CONFIRMED_MESH : 0;
+                    }
                     loaded.add({
                         :targetId => it["targetId"],
                         :sender => it["sender"],
                         :text => it["text"],
-                        :isOutgoing => it["isOutgoing"],
+                        :isOutgoing => isOut,
                         :time => it["time"],
-                        :isRead => it["isRead"]
+                        :isRead => isRead,
+                        :status => st
                     });
                 }
                 _messages = loaded;
@@ -36,26 +48,39 @@ class ChatHistoryManager {
         } catch (e) {
             _messages = [] as Array<Dictionary>;
         }
+    }
 
-        // Pre-seed with initial messages if empty
-        if (_messages.size() == 0) {
-            var now = Time.now().value();
-            addMessageWithTime("CH_0", "Basisstation", "Mesh Gateway online. Kanal 0 bereit.", false, now - 600, true);
-            addMessageWithTime("CH_0", "Florian", "Funktest Bergwacht OK. Empfang sauber.", false, now - 180, false);
-            addMessageWithTime("CH_0", "Ich", "Verstanden, danke!", true, now - 120, true);
-            addMessageWithTime("CT_NODE_COMP1", "Begleiter 1", "Bin 200m hinter dir am Steig.", false, now - 300, false);
+    public static function clearHistory() as Void {
+        _messages = [] as Array<Dictionary>;
+        try {
+            Storage.deleteValue(STORAGE_KEY);
+        } catch (e) {
+            // ignore
         }
     }
 
     public static function addMessage(targetId as String, sender as String, text as String, isOutgoing as Boolean) as Void {
-        addMessageWithTime(targetId, sender, text, isOutgoing, null, isOutgoing ? true : false);
+        addMessageFull(targetId, sender, text, isOutgoing, null, isOutgoing ? true : false, isOutgoing ? STATUS_SENT_NODE : 0);
+    }
+
+    public static function addIncomingMessage(targetId as String, sender as String, text as String) as Void {
+        addMessageFull(targetId, sender, text, false, null, false, 0);
+    }
+
+    public static function addMessageWithStatus(targetId as String, sender as String, text as String, isOutgoing as Boolean, status as Number) as Void {
+        addMessageFull(targetId, sender, text, isOutgoing, null, isOutgoing ? true : false, status);
     }
 
     public static function addMessageWithTime(targetId as String, sender as String, text as String, isOutgoing as Boolean, customTime as Number?, isRead as Boolean?) as Void {
+        addMessageFull(targetId, sender, text, isOutgoing, customTime, isRead, isOutgoing ? STATUS_CONFIRMED_MESH : 0);
+    }
+
+    public static function addMessageFull(targetId as String, sender as String, text as String, isOutgoing as Boolean, customTime as Number?, isRead as Boolean?, status as Number?) as Void {
         initializeHistory();
 
         var t = (customTime != null) ? customTime : Time.now().value();
         var readStatus = (isRead != null) ? isRead : (isOutgoing ? true : false);
+        var msgStatus = (status != null) ? status : (isOutgoing ? STATUS_SENT_NODE : 0);
 
         var msg = {
             :targetId => targetId,
@@ -63,7 +88,8 @@ class ChatHistoryManager {
             :text => text,
             :isOutgoing => isOutgoing,
             :time => t,
-            :isRead => readStatus
+            :isRead => readStatus,
+            :status => msgStatus
         };
 
         _messages.add(msg);
@@ -86,7 +112,8 @@ class ChatHistoryManager {
                     "text" => m[:text],
                     "isOutgoing" => m[:isOutgoing],
                     "time" => m[:time],
-                    "isRead" => m[:isRead]
+                    "isRead" => m[:isRead],
+                    "status" => (m.hasKey(:status) && m[:status] != null) ? m[:status] : 0
                 });
             }
             Storage.setValue(STORAGE_KEY, serialized);
@@ -109,6 +136,18 @@ class ChatHistoryManager {
         return result;
     }
 
+    public static function hasMessagesForTarget(targetId as String) as Boolean {
+        initializeHistory();
+        for (var i = 0; i < _messages.size(); i++) {
+            var m = _messages[i];
+            var tid = m[:targetId] as String;
+            if (tid.equals(targetId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static function getLastMessageForTarget(targetId as String) as Dictionary? {
         initializeHistory();
         for (var i = _messages.size() - 1; i >= 0; i--) {
@@ -128,8 +167,8 @@ class ChatHistoryManager {
             var m = _messages[i];
             var tid = m[:targetId] as String;
             var isOut = m[:isOutgoing] as Boolean;
-            var read = (m has :isRead && m[:isRead] != null) ? (m[:isRead] as Boolean) : true;
-            if (tid.equals(targetId) && !isOut && !read) {
+            var isRead = (m.hasKey(:isRead) && m[:isRead] == true);
+            if (tid.equals(targetId) && !isOut && !isRead) {
                 count++;
             }
         }
@@ -143,7 +182,7 @@ class ChatHistoryManager {
             var m = _messages[i];
             var tid = m[:targetId] as String;
             if (tid.equals(targetId)) {
-                if (m has :isRead && !m[:isRead]) {
+                if (m.hasKey(:isRead) && !m[:isRead]) {
                     m[:isRead] = true;
                     changed = true;
                 }
@@ -154,13 +193,44 @@ class ChatHistoryManager {
         }
     }
 
+    public static function advanceOutgoingStatus(fromStatus as Number, toStatus as Number) as Boolean {
+        initializeHistory();
+        for (var i = 0; i < _messages.size(); i++) {
+            var m = _messages[i];
+            if (m[:isOutgoing] == true) {
+                var st = (m.hasKey(:status) && m[:status] != null) ? (m[:status] as Number) : 0;
+                if (st == fromStatus) {
+                    m[:status] = toStatus;
+                    persistMessages();
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static function updateLastOutgoingStatus(newStatus as Number) as Void {
+        initializeHistory();
+        for (var i = _messages.size() - 1; i >= 0; i--) {
+            var m = _messages[i];
+            if (m[:isOutgoing] == true) {
+                var st = (m.hasKey(:status) && m[:status] != null) ? (m[:status] as Number) : 0;
+                if (st < newStatus) {
+                    m[:status] = newStatus;
+                    persistMessages();
+                    return;
+                }
+            }
+        }
+    }
+
     public static function formatTimeAgo(timestamp as Number) as String {
         var now = Time.now().value();
         var diff = now - timestamp;
         if (diff < 0) { diff = 0; }
 
         if (diff < 60) {
-            return "gerade";
+            return I18n.get(Rez.Strings.TimeJustNow);
         } else if (diff < 3600) {
             var min = (diff / 60).toNumber();
             return min.toString() + "m";

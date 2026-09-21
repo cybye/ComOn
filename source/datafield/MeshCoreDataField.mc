@@ -5,6 +5,7 @@ import Toybox.FitContributor;
 import Toybox.Application.Storage;
 import Toybox.Lang;
 import Toybox.System;
+import Toybox.Time;
 
 class MeshCoreDataField extends WatchUi.DataField {
     private var _rssiField as FitContributor.Field?;
@@ -16,6 +17,7 @@ class MeshCoreDataField extends WatchUi.DataField {
     private var _lastRssiText as String = "Offline";
     private var _lastBeaconText as String = "Wartet";
     private var _lastTargetText as String = "Kanal 0";
+    private var _lastInboxPollAt as Number = 0;
 
     function initialize() {
         DataField.initialize();
@@ -51,6 +53,13 @@ class MeshCoreDataField extends WatchUi.DataField {
         var disp = TelemetryDispatcher.getInstance();
         disp.tick(bleMgr);
 
+        // Pull incoming node events at a modest cadence while an activity is recording.
+        var now = Time.now().value();
+        if (now - _lastInboxPollAt >= 30) {
+            _lastInboxPollAt = now;
+            bleMgr.pollInboxMessages();
+        }
+
         // 3. Update FitContributor Records (Wardriving)
         if (_fitLoggingEnabled && bleMgr.isConnected) {
             var rssi = bleMgr.loraRssi;
@@ -66,6 +75,9 @@ class MeshCoreDataField extends WatchUi.DataField {
             if (_peersField != null) {
                 _peersField.setData(peers);
             }
+            if (_batField != null && bleMgr.nodeBatteryPercent != null) {
+                _batField.setData(bleMgr.nodeBatteryPercent);
+            }
         }
 
         // 4. Update cached UI strings
@@ -73,7 +85,7 @@ class MeshCoreDataField extends WatchUi.DataField {
             var snrStr = (bleMgr.loraSnr != null && bleMgr.loraSnr > 0) ? ("+" + bleMgr.loraSnr) : (bleMgr.loraSnr != null ? bleMgr.loraSnr.toString() : "-");
             _lastRssiText = bleMgr.loraRssi.toString() + " dBm (" + snrStr + " dB)";
         } else {
-            _lastRssiText = bleMgr.isConnected ? I18n.get(Rez.Strings.StatusConnected) : I18n.get(Rez.Strings.StatusScanning);
+            _lastRssiText = bleMgr.isConnected ? I18n.get(Rez.Strings.StatusConnected) : (bleMgr.isScanning ? I18n.get(Rez.Strings.StatusScanning) : I18n.get(Rez.Strings.StatusDisconnected));
         }
 
         var statStr = agg.isStationary ? I18n.get(Rez.Strings.TelemetryStationary) : "";
@@ -83,7 +95,7 @@ class MeshCoreDataField extends WatchUi.DataField {
             _lastBeaconText = disp.lastSendStatus + " (" + disp.secondsSinceLastSend + "s)" + statStr;
         }
 
-        _lastTargetText = ContactManager.getTargetDisplayName();
+        _lastTargetText = ContactManager.getActivityTelemetryTargetName();
     }
 
     //! Render high-contrast visual display on the Garmin watch face
@@ -124,7 +136,7 @@ class MeshCoreDataField extends WatchUi.DataField {
         // Target Channel / Contact Badge: Identical cyan style directly below status
         var targetY = 64;
         dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT); // Cyan Accent
-        dc.drawText(cx, targetY, fontXtiny, "[" + ContactManager.getTargetDisplayName() + "]", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, targetY, fontXtiny, "[" + _lastTargetText + "]", Graphics.TEXT_JUSTIFY_CENTER);
 
         // 2. PROMINENT CHAT / MESSAGE CARD: Exactly identical position & proportions to Watch App
         var cardW = (width * 0.81).toNumber();

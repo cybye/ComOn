@@ -15,12 +15,12 @@ class ChatThreadDelegate extends WatchUi.InputDelegate {
         System.println("ChatThreadDelegate: onKey key=" + key);
         if (key == WatchUi.KEY_ESC) {
             System.println("ChatThreadDelegate: ESC pressed -> popView");
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            WatchUi.popView(WatchUi.SLIDE_DOWN);
             return true;
         } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
             // Hardware START / ENTER button opens canned reply menu as requested
             System.println("ChatThread: Hardware START button pressed -> opening CannedMessageMenu");
-            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
+            WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_LEFT);
             return true;
         } else if (key == WatchUi.KEY_DOWN) {
             _view.scrollDown();
@@ -38,20 +38,26 @@ class ChatThreadDelegate extends WatchUi.InputDelegate {
         var ty = coords[1];
         System.println("ChatThread: onTap at [" + tx + ", " + ty + "]");
 
-        // Bottom green [Reply / Antworten] touch button bounds
-        // Button is drawn at y: 376..420, x: 122..332 on 454x454 screen.
-        // Generous bounds ensure reliable hit detection for any tap in the button area.
-        if (ty >= 355 && tx >= 60 && tx <= 394) {
-            System.println("ChatThread: Green Reply button clicked -> opening keyboard directly");
-            KeyboardHelper.openKeyboard("");
+        // Top header tap -> Open Node Settings
+        if (ty <= 60) {
+            System.println("ChatThread: Header tapped -> opening NodeSettingsMenu");
+            getBleManager().suspendDiscoveryForUi();
+            WatchUi.pushView(new NodeSettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_UP);
+            return true;
+        }
+
+        // Bottom [Message / Nachricht] pill button bounds
+        if (ty >= 365 && tx >= 60 && tx <= 394) {
+            System.println("ChatThread: Message pill button clicked -> opening keyboard");
+            KeyboardHelper.openKeyboardForTarget("", _view.targetId);
             return true;
         }
 
         // Tap in upper/middle area: if tapped top half, scroll up; bottom half, scroll down
-        if (ty >= 20 && ty < 195) {
+        if (ty > 60 && ty < 215) {
             _view.scrollUp();
             return true;
-        } else if (ty >= 195 && ty < 355) {
+        } else if (ty >= 215 && ty < 365) {
             _view.scrollDown();
             return true;
         }

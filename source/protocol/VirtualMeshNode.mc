@@ -61,24 +61,38 @@ class VirtualMeshNode {
         var cmd = bytes[0] as Number;
 
         if (cmd == MeshProtocol.CMD_APP_START) {
-            // Handshake response: OK, protocol version 1.0
-            deliverNotify([MeshProtocol.RESP_CODE_OK, 0x01, 0x00]);
+            handleAppStart();
+        } else if (cmd == MeshProtocol.CMD_DEVICE_QUERY) {
+            deliverNotify([MeshProtocol.RESP_CODE_DEVICE_INFO, 13, 50, 8]);
         } else if (cmd == MeshProtocol.CMD_SEND_CHANNEL_TXT_MSG) {
             handleSendChannelMessage(bytes);
+        } else if (cmd == MeshProtocol.CMD_SEND_TXT_MSG) {
+            handleSendDirectMessage(bytes);
         } else if (cmd == MeshProtocol.CMD_SYNC_NEXT_MESSAGE) {
             handleSyncNextMessage();
-        } else if (cmd == MeshProtocol.CMD_GET_CHANNELS) {
-            handleGetChannels();
+        } else if (cmd == MeshProtocol.CMD_GET_CHANNEL) {
+            handleGetChannel(bytes);
         } else if (cmd == MeshProtocol.CMD_GET_CONTACTS) {
             handleGetContacts(bytes);
         } else if (cmd == MeshProtocol.CMD_SET_DEVICE_TIME) {
             handleSetDeviceTime(bytes);
         } else if (cmd == MeshProtocol.CMD_GET_BATTERY_AND_STORAGE) {
             handleGetBattery();
+        } else if (cmd == MeshProtocol.CMD_GET_STATS) {
+            handleGetStats(bytes);
         } else {
             // Default OK
             deliverNotify([MeshProtocol.RESP_CODE_OK]);
         }
+    }
+
+    private function handleAppStart() as Void {
+        var response = [] as Array<Number>;
+        response.add(MeshProtocol.RESP_CODE_SELF_INFO);
+        for (var index = 1; index < 58; index++) { response.add(0); }
+        var nameBytes = "Virtual-Node".toUtf8Array();
+        for (var nameIndex = 0; nameIndex < nameBytes.size(); nameIndex++) { response.add(nameBytes[nameIndex]); }
+        deliverNotify(response);
     }
 
     private function handleSendChannelMessage(bytes as ByteArray) as Void {
@@ -96,13 +110,52 @@ class VirtualMeshNode {
 
         System.println("VirtualNode RX Channel " + channelIdx + ": " + text);
 
-        // Respond with RESP_CODE_SENT
+        // Respond with RESP_CODE_SENT (Single check ✓)
         deliverNotify([MeshProtocol.RESP_CODE_SENT, 0x00]);
+
+        // Schedule PushSendConfirmed (0x82) after 400ms (Double check ✓✓)
+        if (_meshSendConfirmTimer == null) {
+            _meshSendConfirmTimer = new Timer.Timer();
+        }
+        _meshSendConfirmTimer.start(method(:onMeshSendConfirmedTrigger), 400, false);
 
         // If echo mode active, simulate remote response
         if (echoMode && text.length() > 0) {
             scheduleEchoReply(text, channelIdx);
         }
+    }
+
+    private function handleSendDirectMessage(bytes as ByteArray) as Void {
+        // [CMD_SEND_TXT_MSG(1), txt_type(1), attempt(1), timestamp(4), pubkey_prefix(6), text...]
+        var text = "";
+        if (bytes.size() > 13) {
+            var textBytes = [] as Array<Number>;
+            for (var i = 13; i < bytes.size(); i++) {
+                textBytes.add(bytes[i]);
+            }
+            text = StringUtil.utf8ArrayToString(textBytes);
+        }
+
+        var pubkeyHex = "";
+        for (var p = 7; p < 13 && p < bytes.size(); p++) {
+            var b = bytes[p] & 0xFF;
+            pubkeyHex += b.format("%02X");
+        }
+
+        System.println("VirtualNode RX DM to " + pubkeyHex + ": " + text);
+
+        // Respond with RESP_CODE_SENT (Single check ✓)
+        deliverNotify([MeshProtocol.RESP_CODE_SENT, 0x00]);
+
+        // Schedule PushSendConfirmed (0x82) after 400ms (Double check ✓✓)
+        if (_meshSendConfirmTimer == null) {
+            _meshSendConfirmTimer = new Timer.Timer();
+        }
+        _meshSendConfirmTimer.start(method(:onMeshSendConfirmedTrigger), 400, false);
+    }
+
+    public function onMeshSendConfirmedTrigger() as Void {
+        deliverNotify([0x82, 0x00]);
     }
 
     private function handleSyncNextMessage() as Void {
@@ -118,46 +171,34 @@ class VirtualMeshNode {
             var sender = msg[:sender] as String;
             var text = msg[:text] as String;
 
-            // Transmit as formatted incoming string over virtual NUS: "Sender: Text"
-            var fullStr = sender + ": " + text;
-            deliverNotify(fullStr.toUtf8Array());
+            var frame = [MeshProtocol.RESP_CODE_CHANNEL_MSG, msg[:channelIdx], 0xFF, 0] as Array<Number>;
+            var timestamp = msg[:time] as Number;
+            frame.add(timestamp & 0xFF);
+            frame.add((timestamp >> 8) & 0xFF);
+            frame.add((timestamp >> 16) & 0xFF);
+            frame.add((timestamp >> 24) & 0xFF);
+            var textBytes = (sender + ": " + text).toUtf8Array();
+            for (var textIndex = 0; textIndex < textBytes.size(); textIndex++) { frame.add(textBytes[textIndex]); }
+            deliverNotify(frame);
         } else {
-            // Queue empty -> return RESP_CODE_OK
-            var resp = [] as Array<Number>;
-            resp.add(MeshProtocol.RESP_CODE_OK);
-            resp.add(0);
-            deliverNotify(resp);
+            deliverNotify([MeshProtocol.RESP_CODE_NO_MORE_MESSAGES]);
         }
     }
 
-    private function handleGetChannels() as Void {
-        // 1. Send RESP_CODE_CHANNELS_START
-        var frames = [] as Array;
-        frames.add([MeshProtocol.RESP_CODE_CHANNELS_START]);
-
-        // 2. Stream channels: RESP_CODE_CHANNEL (8) | channel_idx (1B) | name_len (1B) | name_bytes (NB)
-        for (var i = 0; i < _channels.size(); i++) {
-            var ch = _channels[i];
-            var chIdx = ch[:idx] as Number;
-            var nameBytes = (ch[:name] as String).toUtf8Array();
-            var frame = [
-                MeshProtocol.RESP_CODE_CHANNEL,
-                chIdx,
-                nameBytes.size()
-            ] as Array<Number>;
-            for (var nI = 0; nI < nameBytes.size(); nI++) {
-                frame.add(nameBytes[nI]);
-            }
-            frames.add(frame);
+    private function handleGetChannel(bytes as ByteArray) as Void {
+        var channelIndex = (bytes.size() > 1) ? (bytes[1] as Number) : 0;
+        if (channelIndex >= _channels.size()) {
+            deliverNotify([MeshProtocol.RESP_CODE_ERR, 2]);
+            return;
         }
-
-        // 3. Send RESP_CODE_END_OF_CHANNELS
-        frames.add([MeshProtocol.RESP_CODE_END_OF_CHANNELS]);
-
-        // Deliver frames
-        for (var f = 0; f < frames.size(); f++) {
-            deliverNotify(frames[f]);
+        var channel = _channels[channelIndex];
+        var response = [MeshProtocol.RESP_CODE_CHANNEL_INFO, channelIndex] as Array<Number>;
+        var nameBytes = (channel[:name] as String).toUtf8Array();
+        for (var nameIndex = 0; nameIndex < 32; nameIndex++) {
+            response.add((nameIndex < nameBytes.size()) ? nameBytes[nameIndex] : 0);
         }
+        for (var secretIndex = 0; secretIndex < 16; secretIndex++) { response.add(0); }
+        deliverNotify(response);
     }
 
     private function handleGetContacts(bytes as ByteArray) as Void {
@@ -207,12 +248,21 @@ class VirtualMeshNode {
 
     private function handleGetBattery() as Void {
         var payload = [
-            MeshProtocol.RESP_CODE_OK,
+            MeshProtocol.RESP_CODE_BATT_AND_STORAGE,
             (batteryMv & 0xFF),
             ((batteryMv >> 8) & 0xFF),
-            batteryPercent
+            0, 0, 0, 0, 0, 0, 0, 0
         ] as Array<Number>;
         deliverNotify(payload);
+    }
+
+    private function handleGetStats(bytes as ByteArray) as Void {
+        var statsType = (bytes.size() > 1) ? (bytes[1] as Number) : 0;
+        if (statsType == MeshProtocol.STATS_TYPE_RADIO) {
+            deliverNotify([MeshProtocol.RESP_CODE_STATS, MeshProtocol.STATS_TYPE_RADIO, 0, 0, loraRssi & 0xFF, (loraSnr * 4) & 0xFF, 0, 0, 0, 0, 0, 0, 0, 0]);
+        } else {
+            deliverNotify([MeshProtocol.RESP_CODE_STATS, statsType, batteryMv & 0xFF, (batteryMv >> 8) & 0xFF, 0, 0, 0, 0, 0, 0, 0]);
+        }
     }
 
     //! Inject an incoming message into the node's LoRa radio receiver
@@ -278,6 +328,7 @@ class VirtualMeshNode {
         return _inbox.size();
     }
 
+    private var _meshSendConfirmTimer as Timer.Timer? = null;
     private var _echoTimer as Timer.Timer? = null;
     private var _pendingEchoText as String = "";
     private var _pendingEchoChannel as Number = 0;

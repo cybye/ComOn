@@ -15,7 +15,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         var tid = ContactManager.isContactTarget ? ("CT_" + ContactManager.selectedContactId) : ("CH_" + ContactManager.selectedChannelIdx);
         var label = ContactManager.getTargetDisplayName();
         var view = new ChatThreadView(tid, label);
-        WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
+        WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_UP);
     }
 
     //! 2 O'CLOCK BUTTON (START / SELECT)
@@ -98,24 +98,6 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    //! Explicit key handler
-    function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
-        var key = keyEvent.getKey();
-        System.println("DashboardDelegate: onKey key=" + key);
-        if (key == WatchUi.KEY_DOWN) {
-            return onNextPage();
-        } else if (key == WatchUi.KEY_UP) {
-            return onPreviousPage();
-        } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-            return onSelect();
-        } else if (key == WatchUi.KEY_MENU) {
-            return onMenu();
-        } else if (key == WatchUi.KEY_ESC) {
-            return onBack();
-        }
-        return false;
-    }
-
     //! Touchscreen Tap handler
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
@@ -140,7 +122,7 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
             // 1. Target Badge tap at top (e.g. [#public] / [Florian]) -> Open Chats Menu
             if (ty >= 40 && ty <= 110 && tx >= 90 && tx <= 365) {
                 System.println("DashboardDelegate: Target badge tapped -> opening ChatsMenu");
-                WatchUi.pushView(new ChatsMenu(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
+                WatchUi.pushView(ChatsMenu.create(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
                 return true;
             }
 
@@ -195,21 +177,17 @@ class DashboardDelegate extends WatchUi.BehaviorDelegate {
     }
 
     private function openMainMenu() as Void {
+        if (getBleManager().isPairingInProgress()) {
+            WatchUi.showToast(I18n.get(Rez.Strings.StatusConnecting), null);
+            return;
+        }
+        getBleManager().suspendDiscoveryForUi();
         var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.MenuTitle) });
-
-        // 1. Chats (with active target, threads & unread status)
         var targetLabel = I18n.format(Rez.Strings.MenuActiveTarget, [ ContactManager.getTargetDisplayName() ]);
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuChats), targetLabel, "MENU_CHATS", null));
-
-        // 2. SOS Emergency
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSos), I18n.get(Rez.Strings.MenuSosSub), "MENU_SOS", null));
-
-        // 3. Settings Submenu (Tastatur, BLE freigeben, Simulator)
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSettings), I18n.get(Rez.Strings.MenuSettingsSub), "MENU_SETTINGS", null));
-
-        // 4. Exit
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuExit), null, "MENU_EXIT", null));
-
         WatchUi.pushView(menu, new MainMenuDelegate(), WatchUi.SLIDE_LEFT);
     }
 }
@@ -219,26 +197,10 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
         Menu2InputDelegate.initialize();
     }
 
-    function onSelect(item as WatchUi.MenuItem) as Void {
+    public function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
-        System.println("MainMenuDelegate: onSelect " + id);
-        var bleMgr = getBleManager();
-        var chIdx = ContactManager.selectedChannelIdx;
-
-        if (id.equals("MENU_REPLY")) {
-            var lastSender = bleMgr.lastSender;
-            if (!lastSender.equals("Mesh") && !lastSender.equals("Node (Echo)")) {
-                ContactManager.selectContact(lastSender, lastSender);
-            }
-            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_CHATS")) {
-            WatchUi.pushView(new ChatsMenu(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_MSG")) {
-            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_POS")) {
-            var ok = bleMgr.sendCurrentPosition(chIdx);
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(ok ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected), null);
+        if (id.equals("MENU_CHATS")) {
+            WatchUi.pushView(ChatsMenu.create(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("MENU_SOS")) {
             var sos = new SosView();
             WatchUi.pushView(sos, new SosDelegate(sos), WatchUi.SLIDE_UP);
@@ -249,8 +211,8 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
         }
     }
 
-    function onBack() as Void {
-        System.println("MainMenuDelegate: onBack");
+    public function onBack() as Void {
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        getBleManager().resumeDiscoveryAfterUi();
     }
 }

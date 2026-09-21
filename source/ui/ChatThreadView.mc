@@ -12,12 +12,49 @@ class ChatThreadView extends WatchUi.View {
     function initialize(tid as String, tname as String) {
         View.initialize();
         targetId = tid;
-        targetName = tname;
+
+        // Ensure channel targets always display the correct channel name (#public etc.)
+        if (tid.find("CH_") == 0) {
+            var chIdx = tid.substring(3, tid.length()).toNumber();
+            var chName = null;
+            var channels = ContactManager.getChannels();
+            for (var i = 0; i < channels.size(); i++) {
+                if (channels[i][:idx] == chIdx) {
+                    chName = channels[i][:name] as String;
+                    break;
+                }
+            }
+            if (chName != null) {
+                targetName = chName;
+            } else if (tname != null && tname.length() > 0 && tname.find("#") == 0) {
+                targetName = tname;
+            } else {
+                targetName = "#" + chIdx;
+            }
+            // Synchronize active channel in ContactManager
+            ContactManager.selectChannel(chIdx, targetName);
+        } else if (tid.find("CT_") == 0) {
+            var cid = tid.substring(3, tid.length());
+            var ctName = null;
+            var contacts = ContactManager.getContacts();
+            for (var j = 0; j < contacts.size(); j++) {
+                if (contacts[j][:id] != null && contacts[j][:id].equals(cid)) {
+                    ctName = contacts[j][:name] as String;
+                    break;
+                }
+            }
+            targetName = (ctName != null) ? ctName : tname;
+            // Synchronize active contact in ContactManager
+            ContactManager.selectContact(cid, targetName);
+        } else {
+            targetName = tname;
+        }
     }
 
     function onShow() as Void {
         ChatHistoryManager.markAsRead(targetId);
         _scrollOffset = 0; // Auto-align to newest
+        WatchUi.requestUpdate();
     }
 
     public function scrollUp() as Void {
@@ -41,23 +78,25 @@ class ChatThreadView extends WatchUi.View {
         dc.clear();
 
         var w = dc.getWidth();
-        var h = dc.getHeight();
         var cx = w / 2;
         var fontXtiny = Graphics.FONT_SYSTEM_XTINY;
         var fontTiny  = Graphics.FONT_SYSTEM_TINY;
         var fontH = dc.getFontHeight(fontXtiny);
 
-        // 1. Content Area
+        // 1. Top Header: Chat Title (clean without telemetry clutter)
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, 38, fontTiny, targetName, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // 2. Content Area
         var msgs = ChatHistoryManager.getMessagesForTarget(targetId);
-        var viewportTop = 50;
-        var viewportBottom = 362;
+        var viewportTop = 64;
+        var viewportBottom = 366;
         var viewportH = viewportBottom - viewportTop;
 
         if (msgs.size() == 0) {
             dc.setColor(0x777777, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, 160, fontTiny, targetName, Graphics.TEXT_JUSTIFY_CENTER);
-            dc.drawText(cx, 195, fontXtiny, "Keine Nachrichten", Graphics.TEXT_JUSTIFY_CENTER);
-            dc.drawText(cx, 225, fontXtiny, "Drücke START zum Schreiben", Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(cx, 195, fontTiny, I18n.get(Rez.Strings.NoMessages), Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(cx, 228, fontXtiny, I18n.get(Rez.Strings.PromptPressStartToWrite), Graphics.TEXT_JUSTIFY_CENTER);
         }
 
         // 2. Compute Bubbles & Render
@@ -70,7 +109,8 @@ class ChatThreadView extends WatchUi.View {
             var m = msgs[i];
             var txt = m[:text] as String;
             var isOut = m[:isOutgoing] as Boolean;
-            var sender = isOut ? "Ich" : (m[:sender] as String);
+            var status = (m has :status && m[:status] != null) ? (m[:status] as Number) : 0;
+            var sender = isOut ? I18n.get(Rez.Strings.SenderMe) : (m[:sender] as String);
             var timeStr = ChatHistoryManager.formatTimeAgo(m[:time] as Number);
 
             var lines = wrapMessageText(dc, txt, fontXtiny, maxBubbleW - 24);
@@ -86,10 +126,11 @@ class ChatThreadView extends WatchUi.View {
                 if (lw > longestLine) { longestLine = lw; }
             }
 
-            // Ensure bubble accommodates sender + gap + timestamp
+            // Ensure bubble accommodates sender + gap + timestamp + checkmarks
             var senderW = dc.getTextWidthInPixels(sender, fontXtiny);
             var timeW = dc.getTextWidthInPixels(timeStr, fontXtiny);
-            var headerContentW = senderW + timeW + 20; // at least 20px space between name and time
+            var checkW = isOut ? ((status == 2) ? 14 : 9) : 0;
+            var headerContentW = senderW + timeW + checkW + 24; // space between name, time and check
             if (headerContentW > longestLine) {
                 longestLine = headerContentW;
             }
@@ -104,6 +145,7 @@ class ChatThreadView extends WatchUi.View {
                 :w => computedBubbleW,
                 :h => bubbleH,
                 :isOut => isOut,
+                :status => status,
                 :sender => sender,
                 :timeStr => timeStr
             });
@@ -129,6 +171,7 @@ class ChatThreadView extends WatchUi.View {
             var bh = bl[:h] as Number;
             var bw = bl[:w] as Number;
             var isOut = bl[:isOut] as Boolean;
+            var status = bl[:status] as Number;
             var lines = bl[:lines] as Array<String>;
             var sender = bl[:sender] as String;
             var timeStr = bl[:timeStr] as String;
@@ -137,10 +180,11 @@ class ChatThreadView extends WatchUi.View {
             if ((curY + bh) >= viewportTop && curY <= viewportBottom) {
                 var bx = isOut ? (w - 32 - bw) : 32;
 
-                // Safety space check: truncate sender if name + time is too wide
+                // Safety space check: truncate sender if name + time + check is too wide
                 var availHeaderW = bw - 20;
                 var timeW = dc.getTextWidthInPixels(timeStr, fontXtiny);
-                var maxSenderW = availHeaderW - timeW - 6;
+                var checkW = isOut ? ((status == 2) ? 14 : 9) : 0;
+                var maxSenderW = availHeaderW - timeW - checkW - 10;
                 var displaySender = sender;
                 if (dc.getTextWidthInPixels(displaySender, fontXtiny) > maxSenderW) {
                     while (displaySender.length() > 2 && dc.getTextWidthInPixels(displaySender + "..", fontXtiny) > maxSenderW) {
@@ -151,23 +195,30 @@ class ChatThreadView extends WatchUi.View {
 
                 // Bubble Card Fill & Border
                 if (isOut) {
-                    dc.setColor(0x0d2838, Graphics.COLOR_TRANSPARENT); // Deep Teal
-                    dc.fillRoundedRectangle(bx, curY, bw, bh, 8);
-                    dc.setColor(0x185675, Graphics.COLOR_TRANSPARENT);
-                    dc.drawRoundedRectangle(bx, curY, bw, bh, 8);
+                    dc.setColor(0x0e4727, Graphics.COLOR_TRANSPARENT); // WhatsApp Dark Green
+                    dc.fillRoundedRectangle(bx, curY, bw, bh, 10);
+                    dc.setColor(0x18703e, Graphics.COLOR_TRANSPARENT);
+                    dc.drawRoundedRectangle(bx, curY, bw, bh, 10);
 
-                    // Header: "Ich" + time
-                    dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
+                    // Header: "Ich"
+                    dc.setColor(0x25d366, Graphics.COLOR_TRANSPARENT);
                     dc.drawText(bx + 10, curY + 6, fontXtiny, displaySender, Graphics.TEXT_JUSTIFY_LEFT);
-                    dc.setColor(0x6688aa, Graphics.COLOR_TRANSPARENT);
-                    dc.drawText(bx + bw - 10, curY + 6, fontXtiny, timeStr, Graphics.TEXT_JUSTIFY_RIGHT);
-                } else {
-                    dc.setColor(0x151b26, Graphics.COLOR_TRANSPARENT); // Dark Navy
-                    dc.fillRoundedRectangle(bx, curY, bw, bh, 8);
-                    dc.setColor(0x283547, Graphics.COLOR_TRANSPARENT);
-                    dc.drawRoundedRectangle(bx, curY, bw, bh, 8);
 
-                    // Header: Sender name in Orange + time
+                    // Right side: Checkmarks + Time
+                    var cW = (status == 2) ? 14 : 9;
+                    var checkX = bx + bw - 10 - cW;
+                    var checkY = curY + 10;
+                    ChatsListView.drawStatusCheckmark(dc, checkX, checkY, status);
+
+                    dc.setColor(0x88c4a0, Graphics.COLOR_TRANSPARENT);
+                    dc.drawText(checkX - 5, curY + 6, fontXtiny, timeStr, Graphics.TEXT_JUSTIFY_RIGHT);
+                } else {
+                    dc.setColor(0x1a232f, Graphics.COLOR_TRANSPARENT); // Dark Grey Card
+                    dc.fillRoundedRectangle(bx, curY, bw, bh, 10);
+                    dc.setColor(0x2f3e52, Graphics.COLOR_TRANSPARENT);
+                    dc.drawRoundedRectangle(bx, curY, bw, bh, 10);
+
+                    // Header: Sender name in Cyan/Orange + time
                     dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT);
                     dc.drawText(bx + 10, curY + 6, fontXtiny, displaySender, Graphics.TEXT_JUSTIFY_LEFT);
                     dc.setColor(0x888888, Graphics.COLOR_TRANSPARENT);
@@ -187,27 +238,27 @@ class ChatThreadView extends WatchUi.View {
 
         // Scroll Indicators (positioned outside viewport so they never overlap bubbles)
         if (_scrollOffset < _maxScroll) {
-            dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-            dc.fillPolygon([[cx - 7, 43], [cx + 7, 43], [cx, 35]]);
+            dc.setColor(0x00e676, Graphics.COLOR_TRANSPARENT);
+            dc.fillPolygon([[cx - 7, 58], [cx + 7, 58], [cx, 51]]);
         }
         if (_scrollOffset > 0) {
-            dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT);
-            dc.fillPolygon([[cx - 7, 365], [cx + 7, 365], [cx, 373]]);
+            dc.setColor(0x00e676, Graphics.COLOR_TRANSPARENT);
+            dc.fillPolygon([[cx - 7, 368], [cx + 7, 368], [cx, 375]]);
         }
 
-        // 3. Bottom Quick Action Button: [ Antworten ]
-        var btnW = 210;
-        var btnH = 44;
+        // 3. Bottom Quick Action Button: Green WhatsApp Pill [ Nachricht / Message ]
+        var btnW = 230;
+        var btnH = 46;
         var btnX = cx - (btnW / 2);
-        var btnY = 376;
+        var btnY = 378;
 
-        dc.setColor(0x155724, Graphics.COLOR_TRANSPARENT); // Forest Green
-        dc.fillRoundedRectangle(btnX, btnY, btnW, btnH, 10);
-        dc.setColor(0x00e676, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(btnX, btnY, btnW, btnH, 10);
+        dc.setColor(0x124726, Graphics.COLOR_TRANSPARENT); // WhatsApp Forest Green Fill
+        dc.fillRoundedRectangle(btnX, btnY, btnW, btnH, 23);
+        dc.setColor(0x00e676, Graphics.COLOR_TRANSPARENT); // Bright WhatsApp Green Border
+        dc.drawRoundedRectangle(btnX, btnY, btnW, btnH, 23);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, btnY + (btnH / 2) - 2, fontXtiny, I18n.get(Rez.Strings.ReplyTitle), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(cx, btnY + (btnH / 2) - 2, fontTiny, I18n.get(Rez.Strings.MessageLabel), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function wrapMessageText(dc as Graphics.Dc, text as String, font as Graphics.FontDefinition, maxWidth as Number) as Array<String> {

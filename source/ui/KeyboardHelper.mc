@@ -24,7 +24,7 @@ class KeyboardHelper {
                 _mode = MODE_QWERTY;
             }
         }
-        return _mode as Number;
+        return (_mode != null && (_mode instanceof Number)) ? (_mode as Number) : MODE_QWERTY;
     }
 
     public static function setKeyboardMode(mode as Number) as Void {
@@ -36,29 +36,35 @@ class KeyboardHelper {
         }
     }
 
-    public static function getModeName(mode as Number) as String {
-        if (mode == MODE_QWERTZ) {
-            return "QWERTZ (Touch)";
-        } else if (mode == MODE_NATIVE) {
-            return "Nativ (Garmin)";
-        } else {
-            return "QWERTY (Touch)";
+    public static function getModeName(mode as Object?) as String {
+        if (mode != null && (mode instanceof Number)) {
+            if (mode == MODE_QWERTZ) {
+                return "QWERTZ (Touch)";
+            } else if (mode == MODE_NATIVE) {
+                return "Nativ (Garmin)";
+            }
         }
+        return "QWERTY (Touch)";
     }
 
     public static function openKeyboard(initialText as String) as Void {
+        openKeyboardForTarget(initialText, null);
+    }
+
+    public static function openKeyboardForTarget(initialText as String, targetId as String?) as Void {
         var mode = getKeyboardMode();
         System.println("KeyboardHelper.openKeyboard: mode=" + mode + " (" + getModeName(mode) + ")");
         if (mode == MODE_NATIVE) {
             if (WatchUi has :TextPicker) {
-                WatchUi.pushView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(), WatchUi.SLIDE_DOWN);
+                WatchUi.pushView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(targetId), WatchUi.SLIDE_DOWN);
             } else {
                 WatchUi.showToast("Natives Rad nicht verfuegbar", null);
             }
         } else {
             var isQwerty = (mode == MODE_QWERTY);
             var keyView = new QwertyKeyboardView(initialText, isQwerty);
-            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView), WatchUi.SLIDE_DOWN);
+            WatchUi.pushView(keyView, new QwertyKeyboardDelegate(keyView, targetId), WatchUi.SLIDE_UP);
+            WatchUi.requestUpdate();
         }
     }
 }

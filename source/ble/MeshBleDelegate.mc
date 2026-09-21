@@ -18,6 +18,10 @@ class MeshBleDelegate extends BluetoothLowEnergy.BleDelegate {
         _manager.procConnectedStateChanged(device, state);
     }
 
+    function onEncryptionStatus(device as BluetoothLowEnergy.Device, status as BluetoothLowEnergy.Status) as Void {
+        _manager.procEncryptionStatus(device, status);
+    }
+
     function onCharacteristicChanged(characteristic as BluetoothLowEnergy.Characteristic, value as ByteArray) as Void {
         _manager.procCharacteristicChanged(characteristic, value);
     }

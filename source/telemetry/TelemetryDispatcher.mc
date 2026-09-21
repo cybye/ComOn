@@ -57,62 +57,20 @@ class TelemetryDispatcher {
 
         secondsSinceLastSend = 0;
 
-        // Check configured telemetry format (0 = Binary, 1 = ASCII Text)
-        var fmt = Storage.getValue("telemetryFormat");
-        if (fmt == null) { fmt = 0; }
-
-        var chIdx = ContactManager.selectedChannelIdx;
-        var isDirect = ContactManager.isContactTarget;
-        var targetName = ContactManager.getTargetDisplayName();
-
-        var success = false;
-
-        if ((fmt as Number) == 0) {
-            // Option 1: Ultra-compact Binary format
-            var batPct = System.getSystemStats().battery.toNumber();
-            var buffered = agg.flushBufferedSamples();
-
-            var packetBytes = null;
-            if (buffered.size() > 0) {
-                // Multi-sample bundle
-                packetBytes = MeshProtocol.encodeMultiSampleTelemetry(
-                    agg.currentLat as Double,
-                    agg.currentLon as Double,
-                    (agg.currentAlt != null) ? (agg.currentAlt as Float) : 0.0,
-                    (agg.currentHr != null) ? (agg.currentHr as Number) : 0,
-                    buffered
-                );
-            } else {
-                // Single fix frame
-                packetBytes = MeshProtocol.encodeBinaryTelemetry(
-                    agg.currentLat,
-                    agg.currentLon,
-                    agg.currentAlt,
-                    agg.currentHr,
-                    agg.currentSpeedKmh,
-                    batPct,
-                    agg.isStationary,
-                    false
-                );
-            }
-
-            success = bleManager.sendRaw(packetBytes);
-            lastSendStatus = success ? ("Binär -> " + targetName) : "Sendefehler";
-        } else {
-            // Option 2: Human-readable ASCII Text format
-            var text = MeshProtocol.formatDetailedPositionString(
-                agg.currentLat,
-                agg.currentLon,
-                agg.currentAlt,
-                agg.currentHr,
-                agg.currentSpeedKmh,
-                agg.isStationary,
-                false
-            );
-
-            success = bleManager.sendChannelText(chIdx, text);
-            lastSendStatus = success ? ("Text -> " + targetName) : "Sendefehler";
-        }
+        var channelIdx = ContactManager.getActivityTelemetryChannelIdx();
+        var contactId = ContactManager.isActivityTelemetryContactTarget() ? ContactManager.getActivityTelemetryContactId() : null;
+        var targetName = ContactManager.getActivityTelemetryTargetName();
+        var text = MeshProtocol.formatDetailedPositionString(
+            agg.currentLat,
+            agg.currentLon,
+            agg.currentAlt,
+            agg.currentHr,
+            agg.currentSpeedKmh,
+            agg.isStationary,
+            false
+        );
+        var success = bleManager.sendTextToTarget(channelIdx, contactId, text);
+        lastSendStatus = success ? ("Aktivität -> " + targetName) : "Sendefehler";
 
         if (success) {
             totalPacketsSent++;

@@ -18,6 +18,7 @@ class SosView extends WatchUi.View {
         _timer = new Timer.Timer();
         _timer.start(method(:onTick), 1000, true);
         triggerVibe();
+        WatchUi.requestUpdate();
     }
 
     function onHide() as Void {

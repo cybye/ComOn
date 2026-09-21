@@ -1,9 +1,9 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-class TargetSelectMenu extends WatchUi.Menu2 {
-    function initialize() {
-        Menu2.initialize({ :title => I18n.get(Rez.Strings.TargetSelectTitle) });
+class TargetSelectMenu {
+    public static function create() as WatchUi.Menu2 {
+        var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.TargetSelectTitle) });
 
         var activeBadge = I18n.get(Rez.Strings.ActiveBadge);
 
@@ -12,16 +12,26 @@ class TargetSelectMenu extends WatchUi.Menu2 {
         for (var i = 0; i < channels.size(); i++) {
             var ch = channels[i];
             var isSel = (!ContactManager.isContactTarget && ContactManager.selectedChannelIdx == (ch[:idx] as Number));
-            addItem(new WatchUi.MenuItem(ch[:name] as String, isSel ? activeBadge : null, "CH_" + ch[:idx], null));
+            menu.addItem(new WatchUi.MenuItem(ch[:name] as String, isSel ? activeBadge : null, "CH_" + ch[:idx], null));
         }
 
-        // Contacts
-        var contacts = ContactManager.getContacts();
-        for (var j = 0; j < contacts.size(); j++) {
+        // Contacts (Client nodes only, max 40 to avoid Menu2 watchdog timeout)
+        var contacts = ContactManager.getClientContacts();
+        var maxCt = 40;
+        var totalCt = contacts.size();
+        var countToShow = (totalCt > maxCt) ? maxCt : totalCt;
+        for (var j = 0; j < countToShow; j++) {
             var c = contacts[j];
             var isSel = (ContactManager.isContactTarget && ContactManager.selectedContactId != null && ContactManager.selectedContactId.equals(c[:id]));
-            addItem(new WatchUi.MenuItem(c[:name] as String, isSel ? activeBadge : null, "CT_" + c[:id], null));
+            menu.addItem(new WatchUi.MenuItem(c[:name] as String, isSel ? activeBadge : null, "CT_" + c[:id], null));
         }
+
+        if (totalCt > maxCt) {
+            var moreText = I18n.format(Rez.Strings.MoreContacts, [ (totalCt - maxCt) ]);
+            menu.addItem(new WatchUi.MenuItem(moreText, null, "MORE_INFO", null));
+        }
+
+        return menu;
     }
 }
 
@@ -33,6 +43,10 @@ class TargetSelectDelegate extends WatchUi.Menu2InputDelegate {
     function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
         var label = item.getLabel();
+
+        if (id.equals("MORE_INFO")) {
+            return;
+        }
 
         if (id.find("CH_") == 0) {
             var chIdx = id.substring(3, id.length()).toNumber();

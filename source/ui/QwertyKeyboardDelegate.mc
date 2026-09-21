@@ -4,10 +4,12 @@ import Toybox.Lang;
 
 class QwertyKeyboardDelegate extends WatchUi.BehaviorDelegate {
     private var _view as QwertyKeyboardView;
+    private var _targetId as String?;
 
-    function initialize(view as QwertyKeyboardView) {
+    function initialize(view as QwertyKeyboardView, targetId as String?) {
         BehaviorDelegate.initialize();
         _view = view;
+        _targetId = targetId;
     }
 
     function onBack() as Boolean {
@@ -84,12 +86,13 @@ class QwertyKeyboardDelegate extends WatchUi.BehaviorDelegate {
     private function sendCurrentText() as Void {
         if (_view.currentText.length() > 0) {
             var bleMgr = getBleManager();
-            var chIdx = ContactManager.selectedChannelIdx;
-            var ok = bleMgr.sendChannelText(chIdx, _view.currentText);
+            var ok = (_targetId != null) ? bleMgr.sendTextToConversation(_targetId as String, _view.currentText) : bleMgr.sendChannelText(ContactManager.selectedChannelIdx, _view.currentText);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(ok ? "Gesendet: " + _view.currentText : "Nicht verbunden", null);
+            if (!ok) {
+                WatchUi.showToast(I18n.get(Rez.Strings.ToastNotConnected), null);
+            }
         } else {
-            WatchUi.showToast("Kein Text eingegeben", null);
+            WatchUi.showToast(I18n.get(Rez.Strings.NoMessages), null);
         }
     }
 }

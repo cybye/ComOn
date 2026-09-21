@@ -97,6 +97,8 @@ Der Hauptbildschirm umfasst **3 Seiten**, die intuitiv über die Hardware-Tasten
 
 Wird durch Druck auf **MENÜ (9 Uhr)** auf Seite 0 geöffnet. Durch die Auslagerung des Standortversands auf Seite 1 (DOWN + START) ist das Menü maximal verschlankt und verzögerungsfrei:
 
+**Navigationsvertrag:** Alle Menüs verwenden Garmin `WatchUi.Menu2` mit dedizierten `Menu2InputDelegate`-Instanzen. Untermenüs werden nativ gepusht, BACK entfernt genau einen View-Frame. BLE-Callbacks verändern niemals den View-Stack.
+
 | Menüpunkt | Untertitel | Ziel-Aktion |
 |---|---|---|
 | **1. Chats** | `Aktiv: <Aktuelles Ziel>` | Öffnet die Chat-Übersicht (`ChatsMenu`) zur Zielauswahl. |
@@ -196,6 +198,7 @@ Phase 2: Notruf aktiv (LoRa Broadcast auf Kanal 0)
 ## 4. Aktivitäts-Datenfeld (`MeshCompanionField`)
 
 Wird während Sportaktivitäten (Wandern, Trailrunning, Bike) als reguläre Datenfeldseite eingebunden:
+* **Eigene Node-Kopplung:** Watch-App und Datenfeld besitzen unterschiedliche Connect-IQ-App-IDs und damit getrennte Storage-/Sensor-Pairing-Datensätze. Die MeshCore-Node muss für das Datenfeld einmal über Garmins native Sensor-Kopplung ausgewählt werden; danach verbindet es den gespeicherten Node automatisch.
 * **Display:** Pixel-identisches AMOLED-Kartenmodul mit Signalbalken, Node-Akkustand und Beacon-Timer.
 * **Menü auf Datenfeldseite (Taste MENÜ lange drücken):**
   * Ermöglicht die Wahl des Zielkanals oder Empfängers für die automatische Telemetrie-Aussendung (Smart Beaconing bei Bewegung alle 60s, bei Stillstand alle 300s).

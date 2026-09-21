@@ -18,12 +18,14 @@ class QwertyKeyboardView extends WatchUi.View {
         View.initialize();
         currentText = initialText;
         isQwerty = qwerty;
+        buildKeyLayout();
     }
 
     function onShow() as Void {
         _cursorTimer = new Timer.Timer();
         _cursorTimer.start(method(:onCursorTimer), 500, true);
         buildKeyLayout();
+        WatchUi.requestUpdate();
     }
 
     function onHide() as Void {

@@ -1,17 +1,19 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-class MessageActionMenu extends WatchUi.Menu2 {
-    function initialize(sender as String) {
-        Menu2.initialize({ :title => sender });
+class MessageActionMenu {
+    public static function create(sender as String) as WatchUi.Menu2 {
+        var menu = new WatchUi.Menu2({ :title => sender });
 
-        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionReplyKeyboard), I18n.get(Rez.Strings.ActionReplyKeyboardSub), "ACT_REPLY_KEY", null));
-        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionReplyCanned), I18n.get(Rez.Strings.ActionReplyCannedSub), "ACT_REPLY_CANNED", null));
-        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionSendLocation), I18n.get(Rez.Strings.ActionSendLocationSub), "ACT_REPLY_POS", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionReplyKeyboard), I18n.get(Rez.Strings.ActionReplyKeyboardSub), "ACT_REPLY_KEY", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionReplyCanned), I18n.get(Rez.Strings.ActionReplyCannedSub), "ACT_REPLY_CANNED", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionSendLocation), I18n.get(Rez.Strings.ActionSendLocationSub), "ACT_REPLY_POS", null));
 
         if (!sender.equals("Mesh") && !sender.equals("Node (Echo)")) {
-            addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionDirectMsg), I18n.format(Rez.Strings.ActionDirectMsgSub, [ sender ]), "ACT_SWITCH_DM", null));
+            menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.ActionDirectMsg), I18n.format(Rez.Strings.ActionDirectMsgSub, [ sender ]), "ACT_SWITCH_DM", null));
         }
+
+        return menu;
     }
 }
 
@@ -19,35 +21,28 @@ class MessageActionDelegate extends WatchUi.Menu2InputDelegate {
     private var _sender as String;
 
     function initialize(sender as String) {
-        Menu2InputDelegate.initialize();
         _sender = sender;
+        Menu2InputDelegate.initialize();
     }
 
-    function onSelect(item as WatchUi.MenuItem) as Void {
+    public function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
-        var bleMgr = getBleManager();
-        var chIdx = ContactManager.selectedChannelIdx;
-
         if (id.equals("ACT_REPLY_KEY")) {
-            if (!_sender.equals("Mesh") && !_sender.equals("Node (Echo)")) {
-                ContactManager.selectContact(_sender, _sender);
-            }
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             KeyboardHelper.openKeyboard("");
         } else if (id.equals("ACT_REPLY_CANNED")) {
-            WatchUi.pushView(new CannedMessageMenu(), new CannedMessageDelegate(), WatchUi.SLIDE_LEFT);
+            WatchUi.pushView(CannedMessageMenu.create(), new CannedMessageDelegate(null), WatchUi.SLIDE_LEFT);
         } else if (id.equals("ACT_REPLY_POS")) {
-            var ok = bleMgr.sendCurrentPosition(chIdx);
+            var sent = getBleManager().sendCurrentPosition(ContactManager.selectedChannelIdx);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(ok ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected), null);
+            WatchUi.showToast(sent ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected), null);
         } else if (id.equals("ACT_SWITCH_DM")) {
             ContactManager.selectContact(_sender, _sender);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(I18n.format(Rez.Strings.TargetSelectedToast, [ _sender ]), null);
         }
     }
 
-    function onBack() as Void {
+    public function onBack() as Void {
         WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 }

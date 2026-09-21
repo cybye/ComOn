@@ -6,10 +6,14 @@ import Toybox.Background;
 import Toybox.Time;
 import Toybox.Application.Storage;
 import Toybox.System;
+import Toybox.Sensor;
 
+(:background)
 class MeshCoreApp extends Application.AppBase {
+    private static const STORAGE_FOREGROUND_ACTIVE as String = "cfg_foreground_active";
     private var _bleManager as MeshBleManager? = null;
     private var _bleDelegate as MeshBleDelegate? = null;
+    private var _isForeground as Boolean = false;
 
     (:background)
     function initialize() {
@@ -20,6 +24,11 @@ class MeshCoreApp extends Application.AppBase {
     }
 
     private function initForeground() as Void {
+        Storage.setValue("cfg_notif_incoming_batch", I18n.get(Rez.Strings.NotifIncomingBatch));
+        Storage.setValue("cfg_notif_open_chat", I18n.get(Rez.Strings.NotifActionOpenChat));
+        Storage.setValue("cfg_notif_open_chats", I18n.get(Rez.Strings.NotifActionOpenChats));
+        ContactManager.loadFromStorage();
+        ContactManager.ensureBackgroundIdentityCaches();
         if (_bleManager == null) {
             _bleManager = new MeshBleManager();
             _bleDelegate = new MeshBleDelegate(_bleManager as MeshBleManager);
@@ -27,7 +36,7 @@ class MeshCoreApp extends Application.AppBase {
         if (_bleDelegate != null && _bleManager != null) {
             BluetoothLowEnergy.setDelegate(_bleDelegate as MeshBleDelegate);
             (_bleManager as MeshBleManager).registerProfile();
-            (_bleManager as MeshBleManager).startScan();
+            (_bleManager as MeshBleManager).connectLatestOrScan();
             (_bleManager as MeshBleManager).onMessageCallback = method(:onAppMessageReceived);
             (_bleManager as MeshBleManager).positionProvider = method(:getFormattedPosition);
             (_bleManager as MeshBleManager).sosProvider = method(:getFormattedSos);
@@ -49,6 +58,9 @@ class MeshCoreApp extends Application.AppBase {
     }
 
     function onStop(state as Dictionary?) as Void {
+        if (_isForeground) {
+            Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
+        }
         if (!(Toybox has :WatchUi) || _bleManager == null) {
             return;
         }
@@ -81,23 +93,33 @@ class MeshCoreApp extends Application.AppBase {
 
     (:background)
     public function getServiceDelegate() as [ System.ServiceDelegate ] {
+        System.println("MeshCoreApp: creating background service delegate");
         return [ new MeshBackgroundDelegate() ];
     }
 
     (:background)
     public function onBackgroundData(data as Application.PropertyValueType) as Void {
         System.println("MeshCoreApp: onBackgroundData callback: " + data);
-        WatchUi.requestUpdate();
     }
 
     function getInitialView() as [Views] or [Views, InputDelegates] {
+        _isForeground = true;
+        Storage.setValue(STORAGE_FOREGROUND_ACTIVE, true);
         initForeground();
-        var view = new DashboardView();
-        return [ view, new DashboardDelegate(view) ];
+        var view = new ChatsListView();
+        return [ view, new ChatsListDelegate(view) ];
     }
 
     public function getBleManager() as MeshBleManager {
         return _bleManager as MeshBleManager;
+    }
+
+    public function getSensorDelegate() as Sensor.SensorDelegate or Null {
+        return new MeshSensorDelegate();
+    }
+
+    public function getSensorConfigurationView(sensor as Sensor.SensorInfo) as [Views] or [Views, InputDelegates] {
+        return [ new MeshSensorConfigurationView(), new MeshSensorConfigurationDelegate() ];
     }
 }
 
