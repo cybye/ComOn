@@ -9,7 +9,7 @@ class TelemetryDispatcher {
     public var baseIntervalSecs as Number = 60;
     public var stationaryIntervalSecs as Number = 300;
 
-    public var secondsSinceLastSend as Number = 0;
+    public var secondsSinceLastSend as Number = 300;
     public var lastSendStatus as String = "Bereit";
     public var totalPacketsSent as Number = 0;
 
@@ -23,6 +23,11 @@ class TelemetryDispatcher {
     }
 
     function initialize() {
+    }
+
+    public function triggerImmediateBeacon() as Void {
+        secondsSinceLastSend = stationaryIntervalSecs;
+        System.println("TelemetryDispatcher: Immediate beacon scheduled");
     }
 
     //! Evaluated every second from compute(info)
@@ -49,17 +54,23 @@ class TelemetryDispatcher {
     }
 
     public function dispatchTelemetry(bleManager as MeshBleManager) as Boolean {
-        var agg = TelemetryAggregator.getInstance();
-        if (!agg.hasGpsFix || agg.currentLat == null || agg.currentLon == null) {
-            lastSendStatus = "Kein GPS";
+        if (!ContactManager.hasActivityTelemetryTarget()) {
+            lastSendStatus = "Senden Aus";
             return false;
         }
 
+        if (!bleManager.isConnected) {
+            lastSendStatus = "Offline";
+            return false;
+        }
+
+        var agg = TelemetryAggregator.getInstance();
         secondsSinceLastSend = 0;
 
         var channelIdx = ContactManager.getActivityTelemetryChannelIdx();
         var contactId = ContactManager.isActivityTelemetryContactTarget() ? ContactManager.getActivityTelemetryContactId() : null;
         var targetName = ContactManager.getActivityTelemetryTargetName();
+
         var text = MeshProtocol.formatDetailedPositionString(
             agg.currentLat,
             agg.currentLon,
@@ -74,6 +85,9 @@ class TelemetryDispatcher {
 
         if (success) {
             totalPacketsSent++;
+            System.println("TelemetryDispatcher: successfully sent beacon to " + targetName + ": " + text);
+        } else {
+            System.println("TelemetryDispatcher: sendTextToTarget failed for " + targetName);
         }
 
         return success;

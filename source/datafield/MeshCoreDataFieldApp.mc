@@ -11,7 +11,9 @@ class MeshCoreDataFieldApp extends Application.AppBase {
 
     function initialize() {
         AppBase.initialize();
+        ContactManager.loadFromStorage();
         _bleManager = new MeshBleManager();
+        _bleManager.setIsDataField(true);
         _bleDelegate = new MeshBleDelegate(_bleManager);
     }
 
@@ -30,6 +32,7 @@ class MeshCoreDataFieldApp extends Application.AppBase {
 
     function onStop(state as Dictionary?) as Void {
         _bleManager.stopScan();
+        _bleManager.releaseNode(0);
     }
 
     function getInitialView() as [Views] or [Views, InputDelegates] {
@@ -42,14 +45,6 @@ class MeshCoreDataFieldApp extends Application.AppBase {
 
     public function getSettingsView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] or Null {
         return [ new DataFieldSettingsMenu(), new DataFieldSettingsDelegate() ];
-    }
-
-    public function getSensorDelegate() as Sensor.SensorDelegate or Null {
-        return new MeshSensorDelegate();
-    }
-
-    public function getSensorConfigurationView(sensor as Sensor.SensorInfo) as [Views] or [Views, InputDelegates] {
-        return [ new MeshSensorConfigurationView(), new MeshSensorConfigurationDelegate() ];
     }
 }
 
@@ -70,12 +65,15 @@ class DataFieldSettingsMenu extends WatchUi.Menu2 {
         var simEnabled = Storage.getValue("sim_virtualNodeEnabled") == true;
         addItem(new WatchUi.MenuItem("Simulator", simEnabled ? "Ein" : "Aus", "SIM_TOGGLE", null));
 
+        var hasTarget = ContactManager.hasActivityTelemetryTarget();
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.DfMenuTxOff), !hasTarget ? activeBadge : null, "TARGET_NONE", null));
+
         // Channels from unified ContactManager
         var channels = ContactManager.getChannels();
         for (var i = 0; i < channels.size(); i++) {
             var ch = channels[i];
             var label = ch[:name] as String;
-            var isSel = (!ContactManager.isActivityTelemetryContactTarget() && ContactManager.getActivityTelemetryChannelIdx() == (ch[:idx] as Number));
+            var isSel = (hasTarget && !ContactManager.isActivityTelemetryContactTarget() && ContactManager.getActivityTelemetryChannelIdx() == (ch[:idx] as Number));
             addItem(new WatchUi.MenuItem(label, isSel ? activeBadge : null, "CH_" + ch[:idx], null));
         }
 
@@ -89,7 +87,7 @@ class DataFieldSettingsMenu extends WatchUi.Menu2 {
             var cId = c[:id] as String;
             var cName = c[:name] as String;
             var selectedId = ContactManager.getActivityTelemetryContactId();
-            var isSel = (ContactManager.isActivityTelemetryContactTarget() && selectedId != null && selectedId.equals(cId));
+            var isSel = (hasTarget && ContactManager.isActivityTelemetryContactTarget() && selectedId != null && selectedId.equals(cId));
             addItem(new WatchUi.MenuItem(cName, isSel ? activeBadge : null, "CT_" + cId, null));
         }
 
@@ -114,16 +112,24 @@ class DataFieldSettingsDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return;
         }
+        if (id.equals("TARGET_NONE")) {
+            ContactManager.disableActivityTelemetryTarget();
+            WatchUi.showToast(I18n.get(Rez.Strings.DfToastTxOff), null);
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            return;
+        }
         if (id.equals("MORE_INFO")) {
             return;
         }
         if (id.find("CH_") == 0) {
             var chIdx = id.substring(3, id.length()).toNumber();
             ContactManager.selectActivityTelemetryChannel(chIdx, item.getLabel());
+            TelemetryDispatcher.getInstance().triggerImmediateBeacon();
             WatchUi.showToast(I18n.format(Rez.Strings.TargetActiveToast, [ item.getLabel() ]), null);
         } else if (id.find("CT_") == 0) {
             var cId = id.substring(3, id.length());
             ContactManager.selectActivityTelemetryContact(cId, item.getLabel());
+            TelemetryDispatcher.getInstance().triggerImmediateBeacon();
             WatchUi.showToast(I18n.format(Rez.Strings.TargetActiveToast, [ item.getLabel() ]), null);
         }
         WatchUi.popView(WatchUi.SLIDE_RIGHT);

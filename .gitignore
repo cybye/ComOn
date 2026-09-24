@@ -1,3 +1,5 @@
 bin/
 *.prg
 developer_key.der
+tmp_*/
+.vscode/

@@ -129,9 +129,9 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
             item.setSubLabel((nextFormat == 0) ? I18n.get(Rez.Strings.SettingFmtBinary) : I18n.get(Rez.Strings.SettingFmtText));
             WatchUi.requestUpdate();
         } else if (id.equals("SET_PAIR")) {
-            bleManager.releaseNode(0);
-            MeshSensorDelegate.clearStoredScanResult();
-            System.exitTo(new System.Intent("system://pairing", {}));
+            bleManager.resumeScan();
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            WatchUi.showToast(I18n.get(Rez.Strings.StatusScanning), null);
         } else if (id.equals("SET_SYNC")) {
             bleManager.forceFullSync();
             WatchUi.showToast(I18n.get(Rez.Strings.ToastSyncStarted), null);

@@ -113,14 +113,6 @@ class MeshCoreApp extends Application.AppBase {
     public function getBleManager() as MeshBleManager {
         return _bleManager as MeshBleManager;
     }
-
-    public function getSensorDelegate() as Sensor.SensorDelegate or Null {
-        return new MeshSensorDelegate();
-    }
-
-    public function getSensorConfigurationView(sensor as Sensor.SensorInfo) as [Views] or [Views, InputDelegates] {
-        return [ new MeshSensorConfigurationView(), new MeshSensorConfigurationDelegate() ];
-    }
 }
 
 function getApp() as MeshCoreApp {

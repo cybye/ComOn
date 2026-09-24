@@ -120,7 +120,7 @@
     <string id="NotifTitle">ComOn</string>
     <string id="NotifSenderTitle">Mesh: $1$</string>
     <string id="NotifIncomingMsg">Incoming message</string>
-    <string id="NotifIncomingBatch">$1$s new messages</string>
+    <string id="NotifIncomingBatch">$1$ new messages</string>
     <string id="NotifActionOpenChat">Open Chat</string>
     <string id="NotifActionOpenChats">Open Chats</string>
     <string id="NotifActionReply">Reply</string>
@@ -137,6 +137,8 @@
     <string id="TelemetryOk">OK</string>
     <string id="TelemetryNodesSuffix">Nodes</string>
     <string id="TelemetryTitle">TELEMETRY</string>
+    <string id="DataPointsCaptured">Captured</string>
+    <string id="DataPointsSent">Sent</string>
     <string id="SensorHeartRate">HR</string>
     <string id="SensorCadence">CAD</string>
     <string id="SensorPower">PWR</string>
@@ -145,6 +147,22 @@
     <string id="SensorBattery">BATT</string>
     <string id="GpsFixOk">FIX OK</string>
     <string id="GpsSearching">SEARCH...</string>
+    <string id="DfStatusStandby">STANDBY</string>
+    <string id="DfSubReady">Ready</string>
+    <string id="DfStatusRecording">RECORDING</string>
+    <string id="DfSubPointsCaptured">$1$ pts captured</string>
+    <string id="DfStatusPaused">PAUSED</string>
+    <string id="DfSubActivityPaused">Paused</string>
+    <string id="DfStatusTxOff">TX: OFF</string>
+    <string id="DfSubFitLogOnly">FIT-Log only</string>
+    <string id="DfSubSentAgo">sent $1$s ago</string>
+    <string id="DfVolumeStats">$1$ pts logged  •  $2$ TX</string>
+    <string id="DfGpsSearching">SEARCHING GPS...</string>
+    <string id="DfGpsFixOk">GPS FIX OK</string>
+    <string id="DfMenuTxOff">Disable TX</string>
+    <string id="DfToastTxOff">LoRa TX Off (Log only)</string>
+    <string id="DfMenuSimulator">Simulator</string>
+    <string id="DfSimulatorToggleToast">Simulator $1$; restart datafield</string>
 
     <!-- FIT Contributions -->
     <string id="FitRssiChart">LoRa RSSI</string>

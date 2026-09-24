@@ -120,7 +120,7 @@
     <string id="NotifTitle">ComOn</string>
     <string id="NotifSenderTitle">Mesh: $1$</string>
     <string id="NotifIncomingMsg">Eingehende Nachricht</string>
-    <string id="NotifIncomingBatch">$1$s neue Nachrichten</string>
+    <string id="NotifIncomingBatch">$1$ neue Nachrichten</string>
     <string id="NotifActionOpenChat">Chat öffnen</string>
     <string id="NotifActionOpenChats">Chats öffnen</string>
     <string id="NotifActionReply">Antworten</string>
@@ -137,6 +137,8 @@
     <string id="TelemetryOk">OK</string>
     <string id="TelemetryNodesSuffix">Nodes</string>
     <string id="TelemetryTitle">TELEMETRIE</string>
+    <string id="DataPointsCaptured">Erfasst</string>
+    <string id="DataPointsSent">Gesendet</string>
     <string id="SensorHeartRate">HRF</string>
     <string id="SensorCadence">TRITT</string>
     <string id="SensorPower">LEISTUNG</string>
@@ -145,6 +147,22 @@
     <string id="SensorBattery">BATT</string>
     <string id="GpsFixOk">FIX OK</string>
     <string id="GpsSearching">SUCHE...</string>
+    <string id="DfStatusStandby">STANDBY</string>
+    <string id="DfSubReady">Bereit</string>
+    <string id="DfStatusRecording">AUFZEICHNUNG</string>
+    <string id="DfSubPointsCaptured">$1$ Pkt. erfasst</string>
+    <string id="DfStatusPaused">PAUSIERT</string>
+    <string id="DfSubActivityPaused">Pausiert</string>
+    <string id="DfStatusTxOff">TX: AUS</string>
+    <string id="DfSubFitLogOnly">Nur FIT-Log</string>
+    <string id="DfSubSentAgo">vor $1$s gesendet</string>
+    <string id="DfVolumeStats">$1$ Pkt. geloggt  •  $2$ TX</string>
+    <string id="DfGpsSearching">SUCHE GPS...</string>
+    <string id="DfGpsFixOk">GPS FIX OK</string>
+    <string id="DfMenuTxOff">Senden Aus</string>
+    <string id="DfToastTxOff">LoRa-Senden Aus (Nur Log)</string>
+    <string id="DfMenuSimulator">Simulator</string>
+    <string id="DfSimulatorToggleToast">Simulator $1$; Datenfeld neu starten</string>
 
     <!-- FIT Contributions -->
     <string id="FitRssiChart">LoRa RSSI</string>

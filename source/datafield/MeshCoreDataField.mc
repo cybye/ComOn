@@ -5,7 +5,6 @@ import Toybox.FitContributor;
 import Toybox.Application.Storage;
 import Toybox.Lang;
 import Toybox.System;
-import Toybox.Time;
 
 class MeshCoreDataField extends WatchUi.DataField {
     private var _rssiField as FitContributor.Field?;
@@ -14,36 +13,98 @@ class MeshCoreDataField extends WatchUi.DataField {
     private var _batField as FitContributor.Field?;
 
     private var _fitLoggingEnabled as Boolean = true;
-    private var _lastRssiText as String = "Offline";
-    private var _lastBeaconText as String = "Wartet";
-    private var _lastTargetText as String = "Kanal 0";
-    private var _lastInboxPollAt as Number = 0;
+    private var _lastTargetText as String = "#public";
+    private var _dataPointsCaptured as Number = 0;
+    private var _timerState as Number = 0; // 0=Stopped/Off, 1=Recording, 2=Paused
+    private var _reconnectTick as Number = 0;
 
     function initialize() {
         DataField.initialize();
+        System.println("MeshCoreDataField: initialize() started");
+        _lastTargetText = ContactManager.getActivityTelemetryTargetName();
 
         var logSetting = Storage.getValue("fitLoggingEnabled");
-        if (logSetting != null) {
+        if (logSetting != null && (logSetting instanceof Boolean)) {
             _fitLoggingEnabled = logSetting as Boolean;
+        } else {
+            _fitLoggingEnabled = true;
         }
+        System.println("MeshCoreDataField: fitLoggingEnabled=" + _fitLoggingEnabled);
 
         // Initialize FitContributor Developer Fields for MeshMapper / Wardriving
         if (_fitLoggingEnabled) {
             try {
-                _rssiField = createField("lora_rssi", 0, FitContributor.DATA_TYPE_SINT8, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "dBm" });
-                _snrField  = createField("lora_snr", 1, FitContributor.DATA_TYPE_SINT8, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "dB" });
-                _peersField = createField("mesh_nodes", 2, FitContributor.DATA_TYPE_UINT8, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "nodes" });
-                _batField  = createField("mesh_bat", 3, FitContributor.DATA_TYPE_UINT8, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "%" });
-                System.println("MeshCoreDataField: FitContributor fields initialized successfully");
+                _rssiField = createField("lora_rssi", 0, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "dBm" });
+                _snrField  = createField("lora_snr", 1, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "dB" });
+                _peersField = createField("mesh_nodes", 2, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "nodes" });
+                _batField  = createField("mesh_bat", 3, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "%" });
+
+                if (_rssiField != null) { _rssiField.setData(0.0); }
+                if (_snrField != null)  { _snrField.setData(0.0); }
+                if (_peersField != null) { _peersField.setData(0.0); }
+                if (_batField != null)  { _batField.setData(0.0); }
+
+                Storage.setValue("dbg_fit_init", "ok");
+                System.println("MeshCoreDataField: FitContributor fields initialized successfully (4 record float)");
             } catch (e) {
-                System.println("MeshCoreDataField: FitContributor init notice: " + e.getErrorMessage());
+                Storage.setValue("dbg_fit_init", "err: " + e.getErrorMessage());
+                System.println("MeshCoreDataField: FitContributor init EXCEPTION: " + e.getErrorMessage());
             }
+        } else {
+            Storage.setValue("dbg_fit_init", "disabled");
+            System.println("MeshCoreDataField: FitContributor is disabled via Storage setting");
         }
+    }
+
+    public function onTimerStart() as Void {
+        System.println("MeshCoreDataField: onTimerStart() event received from OS");
+        _timerState = 1;
+        TelemetryDispatcher.getInstance().triggerImmediateBeacon();
+    }
+
+    public function onTimerStop() as Void {
+        System.println("MeshCoreDataField: onTimerStop() event received from OS");
+        _timerState = 0;
+    }
+
+    public function onTimerPause() as Void {
+        System.println("MeshCoreDataField: onTimerPause() event received from OS");
+        _timerState = 2;
+    }
+
+    public function onTimerResume() as Void {
+        System.println("MeshCoreDataField: onTimerResume() event received from OS");
+        _timerState = 1;
+    }
+
+    public function onTimerReset() as Void {
+        System.println("MeshCoreDataField: onTimerReset() event received from OS");
+        _timerState = 0;
     }
 
     //! Periodic execution (1 Hz) during activity recording
     function compute(info as Activity.Info) as Void {
+        if (info != null && (info has :timerState) && info.timerState != null) {
+            if (info.timerState == Activity.TIMER_STATE_ON) {
+                _timerState = 1;
+            } else if (info.timerState == Activity.TIMER_STATE_PAUSED) {
+                _timerState = 2;
+            } else if (info.timerState == Activity.TIMER_STATE_STOPPED || info.timerState == Activity.TIMER_STATE_OFF) {
+                _timerState = 0;
+            }
+        }
+
         var bleMgr = getDataFieldBleManager();
+
+        _reconnectTick++;
+        if (!bleMgr.isConnected && !bleMgr.isScanning && (_reconnectTick % 5 == 0)) {
+            bleMgr.connectLatestOrScan();
+        }
+
+        // Periodically refresh node battery & radio stats during activity (every 30s)
+        if (bleMgr.isConnected && !bleMgr.isSyncing && (_reconnectTick % 30 == 0)) {
+            bleMgr.requestNodeBattery();
+        }
 
         // 1. Update Telemetry Collector
         var agg = TelemetryAggregator.getInstance();
@@ -53,48 +114,41 @@ class MeshCoreDataField extends WatchUi.DataField {
         var disp = TelemetryDispatcher.getInstance();
         disp.tick(bleMgr);
 
-        // Pull incoming node events at a modest cadence while an activity is recording.
-        var now = Time.now().value();
-        if (now - _lastInboxPollAt >= 30) {
-            _lastInboxPollAt = now;
-            bleMgr.pollInboxMessages();
-        }
-
         // 3. Update FitContributor Records (Wardriving)
-        if (_fitLoggingEnabled && bleMgr.isConnected) {
-            var rssi = bleMgr.loraRssi;
-            var snr = bleMgr.loraSnr;
-            var peers = bleMgr.peerCount;
+        if (_fitLoggingEnabled) {
+            var isConn = bleMgr.isConnected;
+            var rssi = isConn ? bleMgr.loraRssi : null;
+            var snr = isConn ? bleMgr.loraSnr : null;
+            var peers = isConn ? bleMgr.peerCount : 0;
+            var bat = isConn ? bleMgr.nodeBatteryPercent : null;
 
-            if (_rssiField != null && rssi != null) {
-                _rssiField.setData(rssi);
+            try {
+                if (_rssiField != null) {
+                    _rssiField.setData((rssi != null) ? (rssi as Number).toFloat() : 0.0);
+                }
+                if (_snrField != null) {
+                    _snrField.setData((snr != null) ? (snr as Number).toFloat() : 0.0);
+                }
+                if (_peersField != null) {
+                    _peersField.setData((peers as Number).toFloat());
+                }
+                if (_batField != null) {
+                    _batField.setData((bat != null) ? (bat as Number).toFloat() : 0.0);
+                }
+            } catch (e) {
+                System.println("MeshCoreDataField: setData exception: " + e.getErrorMessage());
             }
-            if (_snrField != null && snr != null) {
-                _snrField.setData(snr);
-            }
-            if (_peersField != null) {
-                _peersField.setData(peers);
-            }
-            if (_batField != null && bleMgr.nodeBatteryPercent != null) {
-                _batField.setData(bleMgr.nodeBatteryPercent);
+
+            if (isConn) {
+                _dataPointsCaptured++;
             }
         }
 
-        // 4. Update cached UI strings
-        if (bleMgr.isConnected && bleMgr.loraRssi != null) {
-            var snrStr = (bleMgr.loraSnr != null && bleMgr.loraSnr > 0) ? ("+" + bleMgr.loraSnr) : (bleMgr.loraSnr != null ? bleMgr.loraSnr.toString() : "-");
-            _lastRssiText = bleMgr.loraRssi.toString() + " dBm (" + snrStr + " dB)";
-        } else {
-            _lastRssiText = bleMgr.isConnected ? I18n.get(Rez.Strings.StatusConnected) : (bleMgr.isScanning ? I18n.get(Rez.Strings.StatusScanning) : I18n.get(Rez.Strings.StatusDisconnected));
+        if (_dataPointsCaptured % 10 == 0) {
+            System.println("MeshCoreDataField: compute() tick, captured=" + _dataPointsCaptured + ", isConn=" + bleMgr.isConnected);
         }
 
-        var statStr = agg.isStationary ? I18n.get(Rez.Strings.TelemetryStationary) : "";
-        if (disp.lastSendStatus.equals("Bereit") || disp.lastSendStatus.equals("Ready")) {
-            _lastBeaconText = I18n.format(Rez.Strings.TelemetryReady, [ disp.secondsSinceLastSend ]) + statStr;
-        } else {
-            _lastBeaconText = disp.lastSendStatus + " (" + disp.secondsSinceLastSend + "s)" + statStr;
-        }
-
+        // 4. Update cached telemetry target name
         _lastTargetText = ContactManager.getActivityTelemetryTargetName();
     }
 
@@ -109,10 +163,17 @@ class MeshCoreDataField extends WatchUi.DataField {
         dc.clear();
 
         var bleMgr = getDataFieldBleManager();
-        var fontXtiny = Graphics.FONT_XTINY;
-        var fontH = dc.getFontHeight(fontXtiny);
+        var disp = TelemetryDispatcher.getInstance();
+        var agg = TelemetryAggregator.getInstance();
 
-        // 1. TOP HEADER: Status Dot + Connection Status
+        var fontXtiny = Graphics.FONT_XTINY;
+        var fontTiny = Graphics.FONT_TINY;
+        var hXtiny = dc.getFontHeight(fontXtiny);
+        var hTiny = dc.getFontHeight(fontTiny);
+
+        // -------------------------------------------------------------
+        // 1. TOP HEADER: Status Dot + Node Name (Safe within top arc)
+        // -------------------------------------------------------------
         var statusColor = Graphics.COLOR_RED;
         var statusText = I18n.get(Rez.Strings.StatusDisconnected);
         if (bleMgr.isConnected) {
@@ -123,93 +184,95 @@ class MeshCoreDataField extends WatchUi.DataField {
             statusText = I18n.get(Rez.Strings.StatusScanning);
         }
 
-        var topY = 34;
+        var headerY = (height * 0.08).toNumber(); // ~33 px
         var textWidth = dc.getTextWidthInPixels(statusText, fontXtiny);
-        var dotX = cx - (textWidth / 2) - 12;
+        var dotX = cx - (textWidth / 2) - 10;
 
         dc.setColor(statusColor, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(dotX, topY + 13, 5);
+        dc.fillCircle(dotX, headerY + (hXtiny / 2), 4);
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx + 4, topY, fontXtiny, statusText, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx + 4, headerY, fontXtiny, statusText, Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Target Channel / Contact Badge: Identical cyan style directly below status
-        var targetY = 64;
-        dc.setColor(0x00d4ff, Graphics.COLOR_TRANSPARENT); // Cyan Accent
-        dc.drawText(cx, targetY, fontXtiny, "[" + _lastTargetText + "]", Graphics.TEXT_JUSTIFY_CENTER);
+        // -------------------------------------------------------------
+        // 2. SECTION 1: RECORDING / FIT LOGGING STATUS
+        // -------------------------------------------------------------
+        var recY = headerY + hXtiny + 16;
+        var recSubY = recY + hTiny + 2;
+        var recTitle = I18n.get(Rez.Strings.DfStatusStandby);
+        var recTitleColor = 0x8898a8;
+        var recSub = I18n.get(Rez.Strings.DfSubReady);
+        var recSubColor = 0x667788;
 
-        // 2. PROMINENT CHAT / MESSAGE CARD: Exactly identical position & proportions to Watch App
-        var cardW = (width * 0.81).toNumber();
-        var cardH = 216;
-        var cardX = cx - (cardW / 2);
-        var cardY = 136;
-
-        // Card container
-        dc.setColor(0x12151f, Graphics.COLOR_TRANSPARENT);
-        dc.fillRoundedRectangle(cardX, cardY, cardW, cardH, 14);
-        dc.setColor(0x28324a, Graphics.COLOR_TRANSPARENT);
-        dc.drawRoundedRectangle(cardX, cardY, cardW, cardH, 14);
-
-        // Message Sender & Preview inside Card
-        var senderName = bleMgr.lastSender;
-        var hasCustomSender = (senderName != null && senderName.length() > 0 && !senderName.equals("Mesh"));
-
-        if (hasCustomSender) {
-            var senderTitle = senderName;
-            var maxSenderW = cardW - 44;
-            if (dc.getTextWidthInPixels(senderTitle, fontXtiny) > maxSenderW) {
-                while (dc.getTextWidthInPixels(senderTitle + "...", fontXtiny) > maxSenderW && senderTitle.length() > 3) {
-                    senderTitle = senderTitle.substring(0, senderTitle.length() - 1);
-                }
-                senderTitle += "...";
-            }
-
-            var headerY = cardY + 10;
-            dc.setColor(0xff9500, Graphics.COLOR_TRANSPARENT); // Garmin Orange Accent
-            dc.drawText(cx, headerY, fontXtiny, senderTitle + ":", Graphics.TEXT_JUSTIFY_CENTER);
-
-            // Subtle separator line
-            var sepY = headerY + fontH + 4;
-            dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
-            dc.drawLine(cardX + 20, sepY, cardX + cardW - 20, sepY);
-
-            var maxTextWidth = cardW - 32;
-            var lineSpacing = 4;
-            var lineHeight = fontH + lineSpacing;
-            var msgTop = sepY + 6;
-            var msgBottom = cardY + cardH - 10;
-            var availableH = msgBottom - msgTop;
-            var maxLines = (availableH / lineHeight).toNumber();
-            if (maxLines < 1) { maxLines = 1; }
-
-            var lines = wrapText(dc, bleMgr.lastReceivedMessage, fontXtiny, maxTextWidth, maxLines);
-            var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
-            var startY = msgTop + ((availableH - totalTextH) / 2);
-
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            for (var i = 0; i < lines.size(); i++) {
-                dc.drawText(cx, startY + (i * lineHeight), fontXtiny, lines[i], Graphics.TEXT_JUSTIFY_CENTER);
-            }
-        } else {
-            // When no custom sender, center cleanly without redundant header or line
-            var msgText = bleMgr.lastReceivedMessage;
-            if (msgText == null || msgText.length() == 0 || msgText.equals("Bereit zum Empfang")) {
-                msgText = I18n.get(Rez.Strings.ReadyToReceive);
-            }
-            var maxTextWidth = cardW - 32;
-            var lineSpacing = 4;
-            var lineHeight = fontH + lineSpacing;
-            var lines = wrapText(dc, msgText, fontXtiny, maxTextWidth, 4);
-            var totalTextH = (lines.size() > 0) ? ((lines.size() - 1) * lineHeight + fontH) : 0;
-            var startY = cardY + ((cardH - totalTextH) / 2);
-
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            for (var j = 0; j < lines.size(); j++) {
-                dc.drawText(cx, startY + (j * lineHeight), fontXtiny, lines[j], Graphics.TEXT_JUSTIFY_CENTER);
+        if (_fitLoggingEnabled) {
+            if (_timerState == 1) { // Recording active
+                recTitle = I18n.get(Rez.Strings.DfStatusRecording);
+                recTitleColor = 0x00e676; // Bright Green
+                recSub = I18n.format(Rez.Strings.DfSubPointsCaptured, [ _dataPointsCaptured ]);
+                recSubColor = 0x88c4a0;
+            } else if (_timerState == 2) { // Paused
+                recTitle = I18n.get(Rez.Strings.DfStatusPaused);
+                recTitleColor = 0xffea00; // Yellow
+                recSub = I18n.get(Rez.Strings.DfSubActivityPaused);
+                recSubColor = 0xaaaaaa;
             }
         }
 
-        // 3. IDENTICAL STATUS FOOTER WITH VECTOR SYMBOLS: [Bat-Icon] 84% | -76 dBm | [Mesh-Icon] 5
+        if (_timerState == 1 && _fitLoggingEnabled) {
+            var recTw = dc.getTextWidthInPixels(recTitle, fontTiny);
+            dc.setColor(0x00e676, Graphics.COLOR_TRANSPARENT);
+            dc.fillCircle(cx - (recTw / 2) - 10, recY + (hTiny / 2), 4);
+        }
+        dc.setColor(recTitleColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, recY, fontTiny, recTitle, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(recSubColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, recSubY, fontXtiny, recSub, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // -------------------------------------------------------------
+        // 3. SECTION 2: MESH TRANSMISSION (TX) STATUS
+        // -------------------------------------------------------------
+        var isTargetActive = ContactManager.hasActivityTelemetryTarget();
+        var txY = recSubY + hXtiny + 16;
+        var txSubY = txY + hTiny + 2;
+
+        var txTitle = I18n.get(Rez.Strings.DfStatusTxOff);
+        var txTitleColor = 0xff9100; // Warm Orange
+        var txSub = I18n.get(Rez.Strings.DfSubFitLogOnly);
+        var txSubColor = 0x888888;
+
+        if (isTargetActive) {
+            var isRecent = (disp.secondsSinceLastSend < 20 && (disp.lastSendStatus.find("Aktivit") != null || disp.lastSendStatus.find("vor") != null || disp.lastSendStatus.find("ago") != null));
+            txTitle = "TX: " + _lastTargetText;
+            txTitleColor = isRecent ? 0x00e676 : 0x00d4ff;
+            if (isRecent) {
+                txSub = I18n.format(Rez.Strings.DfSubSentAgo, [ disp.secondsSinceLastSend ]);
+                txSubColor = 0x00e676;
+            } else {
+                txSub = disp.lastSendStatus + " (" + disp.secondsSinceLastSend + "s)";
+                txSubColor = 0x88c4d8;
+            }
+        }
+
+        dc.setColor(txTitleColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, txY, fontTiny, txTitle, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.setColor(txSubColor, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, txSubY, fontXtiny, txSub, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // -------------------------------------------------------------
+        // 4. SUBTLE DIVIDER & SECONDARY VOLUME INFO (Compact, 1 line)
+        // -------------------------------------------------------------
+        var divY = txSubY + hXtiny + 14;
+        var volY = divY + 6;
+        dc.setColor(0x222a3a, Graphics.COLOR_TRANSPARENT);
+        dc.drawLine(cx - 90, divY, cx + 90, divY);
+
+        var volStr = I18n.format(Rez.Strings.DfVolumeStats, [ _dataPointsCaptured, disp.totalPacketsSent ]);
+        dc.setColor(0x88c4a0, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, volY, fontXtiny, volStr, Graphics.TEXT_JUSTIFY_CENTER);
+
+        // -------------------------------------------------------------
+        // 5. TECHNICAL VITAL FOOTER (Battery, RSSI, Peers)
+        // -------------------------------------------------------------
         var bat = 0;
         var batText = "--%";
         if (bleMgr.isConnected) {
@@ -247,9 +310,9 @@ class MeshCoreDataField extends WatchUi.DataField {
             nodeColor = 0x00d4ff; // Cyan
         }
 
-        var iconBatW = 20;
+        var iconBatW = 18;
         var gapIconText = 4;
-        var iconNodeW = 13;
+        var iconNodeW = 12;
 
         var wBatText = dc.getTextWidthInPixels(batText, fontXtiny);
         var wDiv = dc.getTextWidthInPixels(divText, fontXtiny);
@@ -258,8 +321,8 @@ class MeshCoreDataField extends WatchUi.DataField {
 
         var totalStatusW = iconBatW + gapIconText + wBatText + wDiv + wLora + wDiv + iconNodeW + gapIconText + wNodeText;
         var curX = cx - (totalStatusW / 2);
-        var statusY = 372;
-        var iconY = statusY + ((fontH - 10) / 2);
+        var statusY = volY + hXtiny + 16;
+        var iconY = statusY + ((hXtiny - 10) / 2);
 
         // Draw Battery Icon & %
         drawBatteryIcon(dc, curX, iconY, bat);
@@ -289,9 +352,17 @@ class MeshCoreDataField extends WatchUi.DataField {
         dc.setColor(nodeColor, Graphics.COLOR_TRANSPARENT);
         dc.drawText(curX, statusY, fontXtiny, nodeText, Graphics.TEXT_JUSTIFY_LEFT);
 
-        // 4. BEACON / TELEMETRIE STATUS (DataField-spezifisch)
-        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, 404, fontXtiny, _lastBeaconText, Graphics.TEXT_JUSTIFY_CENTER);
+        // -------------------------------------------------------------
+        // 6. GPS STATUS INDICATOR (Discreet and well within circular boundary)
+        // -------------------------------------------------------------
+        var gpsY = statusY + hXtiny + 14;
+        if (agg.hasGpsFix) {
+            dc.setColor(0x336633, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, gpsY, fontXtiny, I18n.get(Rez.Strings.DfGpsFixOk), Graphics.TEXT_JUSTIFY_CENTER);
+        } else {
+            dc.setColor(0x886622, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, gpsY, fontXtiny, I18n.get(Rez.Strings.DfGpsSearching), Graphics.TEXT_JUSTIFY_CENTER);
+        }
     }
 
     private function drawBatteryIcon(dc as Graphics.Dc, x as Number, y as Number, percent as Number) as Void {
@@ -331,44 +402,5 @@ class MeshCoreDataField extends WatchUi.DataField {
         dc.fillCircle(x + 6, y + 1, 2);
         dc.fillCircle(x + 1, y + 9, 2);
         dc.fillCircle(x + 11, y + 9, 2);
-    }
-
-    private function wrapText(dc as Graphics.Dc, text as String, font as Graphics.FontDefinition, maxWidth as Number, maxLines as Number) as Array<String> {
-        var lines = [] as Array<String>;
-        var words = [] as Array<String>;
-        var startIdx = 0;
-        for (var i = 0; i < text.length(); i++) {
-            if (text.substring(i, i + 1).equals(" ")) {
-                if (i > startIdx) {
-                    words.add(text.substring(startIdx, i));
-                }
-                startIdx = i + 1;
-            }
-        }
-        if (startIdx < text.length()) {
-            words.add(text.substring(startIdx, text.length()));
-        }
-
-        var currentLine = "";
-        for (var w = 0; w < words.size(); w++) {
-            var word = words[w];
-            var testLine = (currentLine.length() == 0) ? word : (currentLine + " " + word);
-            if (dc.getTextWidthInPixels(testLine, font) <= maxWidth) {
-                currentLine = testLine;
-            } else {
-                if (currentLine.length() > 0) {
-                    lines.add(currentLine);
-                    currentLine = "";
-                    if (lines.size() >= maxLines) {
-                        break;
-                    }
-                }
-                currentLine = word;
-            }
-        }
-        if (currentLine.length() > 0 && lines.size() < maxLines) {
-            lines.add(currentLine);
-        }
-        return lines;
     }
 }

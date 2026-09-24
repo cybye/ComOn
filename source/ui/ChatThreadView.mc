@@ -229,7 +229,10 @@ class ChatThreadView extends WatchUi.View {
                 var textStartY = curY + fontH + 10;
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
                 for (var l = 0; l < lines.size(); l++) {
-                    dc.drawText(bx + 10, textStartY + (l * (fontH + 3)), fontXtiny, lines[l], Graphics.TEXT_JUSTIFY_LEFT);
+                    var lineStr = lines[l];
+                    if (lineStr.length() > 0) {
+                        dc.drawText(bx + 10, textStartY + (l * (fontH + 3)), fontXtiny, lineStr, Graphics.TEXT_JUSTIFY_LEFT);
+                    }
                 }
             }
 
@@ -267,39 +270,83 @@ class ChatThreadView extends WatchUi.View {
             return lines;
         }
 
-        var words = [] as Array<String>;
-        var cur = "";
+        var maxLines = 25; // Safety cap against runaway packets or memory spikes
+
+        // 1. Split text into paragraphs on newline (\n), stripping carriage returns (\r)
+        var paragraphs = [] as Array<String>;
+        var curPara = "";
         for (var i = 0; i < text.length(); i++) {
             var ch = text.substring(i, i + 1);
-            if (ch.equals(" ") || ch.equals("\n")) {
-                if (cur.length() > 0) {
-                    words.add(cur);
-                    cur = "";
-                }
+            if (ch.equals("\r")) {
+                continue;
+            }
+            if (ch.equals("\n")) {
+                paragraphs.add(curPara);
+                curPara = "";
             } else {
-                cur += ch;
+                curPara += ch;
             }
         }
-        if (cur.length() > 0) {
-            words.add(cur);
+        if (curPara.length() > 0 || paragraphs.size() == 0) {
+            paragraphs.add(curPara);
         }
 
-        var currentLine = "";
-        for (var wIdx = 0; wIdx < words.size(); wIdx++) {
-            var word = words[wIdx];
-            var testLine = (currentLine.length() == 0) ? word : (currentLine + " " + word);
-            if (dc.getTextWidthInPixels(testLine, font) <= maxWidth) {
-                currentLine = testLine;
-            } else {
-                if (currentLine.length() > 0) {
-                    lines.add(currentLine);
+        // 2. Wrap each paragraph independently, preserving deliberate empty lines
+        for (var pIdx = 0; pIdx < paragraphs.size(); pIdx++) {
+            if (lines.size() >= maxLines) {
+                break;
+            }
+
+            var para = paragraphs[pIdx];
+            if (para.length() == 0) {
+                lines.add("");
+                continue;
+            }
+
+            // Split paragraph into words
+            var words = [] as Array<String>;
+            var curWord = "";
+            for (var w = 0; w < para.length(); w++) {
+                var c = para.substring(w, w + 1);
+                if (c.equals(" ")) {
+                    if (curWord.length() > 0) {
+                        words.add(curWord);
+                        curWord = "";
+                    }
+                } else {
+                    curWord += c;
                 }
-                currentLine = word;
+            }
+            if (curWord.length() > 0) {
+                words.add(curWord);
+            }
+
+            if (words.size() == 0) {
+                lines.add("");
+                continue;
+            }
+
+            var currentLine = "";
+            for (var wIdx = 0; wIdx < words.size(); wIdx++) {
+                var word = words[wIdx];
+                var testLine = (currentLine.length() == 0) ? word : (currentLine + " " + word);
+                if (dc.getTextWidthInPixels(testLine, font) <= maxWidth) {
+                    currentLine = testLine;
+                } else {
+                    if (currentLine.length() > 0) {
+                        lines.add(currentLine);
+                        if (lines.size() >= maxLines) {
+                            break;
+                        }
+                    }
+                    currentLine = word;
+                }
+            }
+            if (currentLine.length() > 0 && lines.size() < maxLines) {
+                lines.add(currentLine);
             }
         }
-        if (currentLine.length() > 0) {
-            lines.add(currentLine);
-        }
+
         return lines;
     }
 }

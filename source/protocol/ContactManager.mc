@@ -24,10 +24,11 @@ class ContactManager {
     private static var _lastContactSyncTime as Number = 0;
     private static var _pairedNodeId as String? = null;
     private static var _activityTargetLoaded as Boolean = false;
+    private static var _activityTargetEnabled as Boolean = false;
     private static var _activityTargetIsContact as Boolean = false;
     private static var _activityTargetChannelIdx as Number = 0;
     private static var _activityTargetContactId as String? = null;
-    private static var _activityTargetName as String = "#public";
+    private static var _activityTargetName as String = "Senden Aus";
 
     private static var _inFullSync as Boolean = false;
     private static var _syncingChannels as Array<Dictionary> = [] as Array<Dictionary>;
@@ -459,13 +460,21 @@ class ContactManager {
         try {
             var stored = Storage.getValue(STORAGE_ACTIVITY_TARGET);
             if (stored == null || !(stored instanceof Dictionary)) {
+                _activityTargetEnabled = false;
+                _activityTargetName = "Senden Aus";
                 return;
             }
             var target = stored as Dictionary;
+            var enabled = target["enabled"];
             var isContact = target["isContact"];
             var channelIdx = target["channelIdx"];
             var contactId = target["contactId"];
             var name = target["name"];
+            if (enabled instanceof Boolean) {
+                _activityTargetEnabled = enabled as Boolean;
+            } else {
+                _activityTargetEnabled = false;
+            }
             if (isContact instanceof Boolean) {
                 _activityTargetIsContact = isContact as Boolean;
             }
@@ -478,7 +487,9 @@ class ContactManager {
             if (name instanceof String && (name as String).length() > 0) {
                 _activityTargetName = name as String;
             }
-            if (_activityTargetIsContact && _activityTargetContactId == null) {
+            if (!_activityTargetEnabled) {
+                _activityTargetName = "Senden Aus";
+            } else if (_activityTargetIsContact && _activityTargetContactId == null) {
                 _activityTargetIsContact = false;
                 _activityTargetName = "#public";
             }
@@ -490,6 +501,7 @@ class ContactManager {
     private static function saveActivityTelemetryTarget() as Void {
         try {
             Storage.setValue(STORAGE_ACTIVITY_TARGET, {
+                "enabled" => _activityTargetEnabled,
                 "isContact" => _activityTargetIsContact,
                 "channelIdx" => _activityTargetChannelIdx,
                 "contactId" => (_activityTargetContactId != null) ? _activityTargetContactId : "",
@@ -498,6 +510,18 @@ class ContactManager {
         } catch (e) {
             System.println("ContactManager: activity target write notice");
         }
+    }
+
+    public static function hasActivityTelemetryTarget() as Boolean {
+        loadActivityTelemetryTarget();
+        return _activityTargetEnabled;
+    }
+
+    public static function disableActivityTelemetryTarget() as Void {
+        _activityTargetLoaded = true;
+        _activityTargetEnabled = false;
+        _activityTargetName = "Senden Aus";
+        saveActivityTelemetryTarget();
     }
 
     public static function isActivityTelemetryContactTarget() as Boolean {
@@ -522,6 +546,7 @@ class ContactManager {
 
     public static function selectActivityTelemetryChannel(idx as Number, name as String) as Void {
         _activityTargetLoaded = true;
+        _activityTargetEnabled = true;
         _activityTargetIsContact = false;
         _activityTargetChannelIdx = idx;
         _activityTargetContactId = null;
@@ -531,6 +556,7 @@ class ContactManager {
 
     public static function selectActivityTelemetryContact(id as String, name as String) as Void {
         _activityTargetLoaded = true;
+        _activityTargetEnabled = true;
         _activityTargetIsContact = true;
         _activityTargetContactId = id;
         _activityTargetName = (name.find("@") == 0) ? name.substring(1, name.length()) : name;

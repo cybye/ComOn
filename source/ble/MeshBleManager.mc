@@ -63,6 +63,33 @@ class MeshBleManager {
     private var _cccdRetryTimer as Timer.Timer? = null;
     private var _cccdRetryCount as Number = 0;
 
+    private var _isDataField as Boolean = false;
+
+    public function setIsDataField(val as Boolean) as Void {
+        _isDataField = val;
+    }
+
+    public function isDataField() as Boolean {
+        return _isDataField;
+    }
+
+    //! Safe Timer constructor: DataField apps do not have permission for Toybox.Timer
+    private function safeTimer() as Timer.Timer? {
+        if (_isDataField) {
+            return null;
+        }
+        var app = Application.getApp();
+        if (app != null && (app has :getSettingsView)) {
+            _isDataField = true;
+            return null;
+        }
+        try {
+            return new Timer.Timer();
+        } catch (e) {
+            return null;
+        }
+    }
+
     public function forceFullSync() as Void {
         _isFullSync = true;
         ContactManager.resetForFullNodeSync();
@@ -82,6 +109,10 @@ class MeshBleManager {
     }
 
     function initialize() {
+        var app = Application.getApp();
+        if (app != null && (app has :getSettingsView)) {
+            _isDataField = true;
+        }
         virtualNode    = VirtualMeshNode.getInstance();
         nusServiceUuid = BluetoothLowEnergy.stringToUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
         nusRxUuid      = BluetoothLowEnergy.stringToUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -132,9 +163,11 @@ class MeshBleManager {
             try {
                 BluetoothLowEnergy.setScanState(BluetoothLowEnergy.SCAN_STATE_SCANNING);
                 if (_scanTimeoutTimer == null) {
-                    _scanTimeoutTimer = new Timer.Timer();
+                    _scanTimeoutTimer = safeTimer();
                 }
-                _scanTimeoutTimer.start(method(:onScanTimeout), 15000, false);
+                if (_scanTimeoutTimer != null) {
+                    _scanTimeoutTimer.start(method(:onScanTimeout), 15000, false);
+                }
                 System.println("BLE scan started");
             } catch (e) {
                 System.println("setScanState notice: " + e.getErrorMessage());
@@ -178,7 +211,7 @@ class MeshBleManager {
     }
 
     public function connectLatestOrScan() as Void {
-        if (isSimulated || isConnected || isScanning || _isPairing || _isResettingPairing) {
+        if (isSimulated || isConnected || isScanning) {
             return;
         }
         try {
@@ -189,8 +222,6 @@ class MeshBleManager {
                 if (device.isConnected()) {
                     System.println("BLE adopting connected paired node");
                     procConnectedStateChanged(device, BluetoothLowEnergy.CONNECTION_STATE_CONNECTED);
-                }
-                if (device.isConnected()) {
                     return;
                 }
             }
@@ -198,47 +229,20 @@ class MeshBleManager {
             System.println("BLE paired-device lookup notice: " + e.getErrorMessage());
         }
 
-        if (connectStoredNodeFallback()) {
-            return;
-        }
-        System.println("BLE no native-paired node; use Pair Node");
+        System.println("BLE starting scan for MeshCore node");
+        startScan();
     }
 
-    private function connectStoredNodeFallback() as Boolean {
-        var storedScanResult = MeshSensorDelegate.getStoredScanResult();
-        if (storedScanResult == null) {
-            return false;
-        }
-
-        _isPairing = true;
-        try {
-            _device = BluetoothLowEnergy.pairDevice(storedScanResult);
-            if (_device == null) {
-                _isPairing = false;
-                System.println("BLE native-pairing fallback was not started");
-                return false;
-            }
-
-            System.println("BLE reconnecting native-paired node fallback");
-            if (_pairTimeoutTimer == null) {
-                _pairTimeoutTimer = new Timer.Timer();
-            }
-            _pairTimeoutTimer.start(method(:onPairTimeout), 10000, false);
-            return true;
-        } catch (e) {
-            _isPairing = false;
-            System.println("BLE native-pairing fallback notice: " + e.getErrorMessage());
-            return false;
-        }
-    }
 
     private function scheduleReconnect(delayMs as Number) as Void {
         if (_reconnectTimer == null) {
-            _reconnectTimer = new Timer.Timer();
+            _reconnectTimer = safeTimer();
         } else {
             _reconnectTimer.stop();
         }
-        _reconnectTimer.start(method(:onReconnectTimer), delayMs, false);
+        if (_reconnectTimer != null) {
+            _reconnectTimer.start(method(:onReconnectTimer), delayMs, false);
+        }
     }
 
     public function onReconnectTimer() as Void {
@@ -268,9 +272,9 @@ class MeshBleManager {
         if (!_isPairing || isConnected) {
             return;
         }
-        System.println("BLE pair timeout -> cancelling attempt");
+        System.println("BLE pair timeout -> cancelling attempt & restarting scan");
         cancelPairAttempt();
-        System.println("BLE reconnect stopped; use Pair Node to repair pairing");
+        startScan();
     }
 
     private function resetStalePairing() as Void {
@@ -295,11 +299,13 @@ class MeshBleManager {
 
     private function schedulePairResetCheck() as Void {
         if (_pairResetTimer == null) {
-            _pairResetTimer = new Timer.Timer();
+            _pairResetTimer = safeTimer();
         } else {
             _pairResetTimer.stop();
         }
-        _pairResetTimer.start(method(:onPairResetCheck), 1000, false);
+        if (_pairResetTimer != null) {
+            _pairResetTimer.start(method(:onPairResetCheck), 1000, false);
+        }
     }
 
     public function onPairResetCheck() as Void {
@@ -418,8 +424,10 @@ class MeshBleManager {
                             if (dev != null) {
                                 _device = dev;
                                 System.println("BLE pairDevice started");
-                                _pairTimeoutTimer = new Timer.Timer();
-                                _pairTimeoutTimer.start(method(:onPairTimeout), 10000, false);
+                                _pairTimeoutTimer = safeTimer();
+                                if (_pairTimeoutTimer != null) {
+                                    _pairTimeoutTimer.start(method(:onPairTimeout), 10000, false);
+                                }
                             } else {
                                 _isPairing = false;
                                 System.println("BLE pairDevice returned null");
@@ -428,7 +436,18 @@ class MeshBleManager {
                         } catch (e) {
                             System.println("BLE pairDevice notice: " + e.getErrorMessage());
                             _isPairing = false;
-                            resetStalePairing();
+                            var pairedIter = BluetoothLowEnergy.getPairedDevices();
+                            if (pairedIter != null) {
+                                var p = pairedIter.next();
+                                if (p != null) {
+                                    _device = p as BluetoothLowEnergy.Device;
+                                }
+                            }
+                            if (_device != null) {
+                                procConnectedStateChanged(_device, BluetoothLowEnergy.CONNECTION_STATE_CONNECTED);
+                            } else {
+                                scheduleReconnect(2000);
+                            }
                         }
                         return;
                     }
@@ -555,9 +574,11 @@ class MeshBleManager {
         }
 
         if (_syncTimeoutTimer == null) {
-            _syncTimeoutTimer = new Timer.Timer();
+            _syncTimeoutTimer = safeTimer();
         }
-        _syncTimeoutTimer.start(method(:onSyncTimeout), requiresFullSync ? 15000 : 8000, false);
+        if (_syncTimeoutTimer != null) {
+            _syncTimeoutTimer.start(method(:onSyncTimeout), requiresFullSync ? 15000 : 8000, false);
+        }
         sendRaw(MeshProtocol.encodeGetBattery());
         if (WatchUi has :requestUpdate) {
             WatchUi.requestUpdate();
@@ -579,11 +600,13 @@ class MeshBleManager {
         _isInboxPolling = true;
         _inboxPollCount = 0;
         if (_inboxPollTimeoutTimer == null) {
-            _inboxPollTimeoutTimer = new Timer.Timer();
+            _inboxPollTimeoutTimer = safeTimer();
         } else {
             _inboxPollTimeoutTimer.stop();
         }
-        _inboxPollTimeoutTimer.start(method(:onInboxPollTimeout), 5000, false);
+        if (_inboxPollTimeoutTimer != null) {
+            _inboxPollTimeoutTimer.start(method(:onInboxPollTimeout), 5000, false);
+        }
         System.println("BLE inbox poll: requesting pending messages");
         if (!sendRaw(MeshProtocol.encodeSyncNextMessage())) {
             finishInboxPoll();
@@ -625,7 +648,7 @@ class MeshBleManager {
                 _txCharacteristic = service.getCharacteristic(nusTxUuid as BluetoothLowEnergy.Uuid);
                 System.println("BLE setupCharacteristics: rx=" + (_rxCharacteristic != null) + " tx=" + (_txCharacteristic != null));
                 _cccdRetryCount = 0;
-                requestCccdDelayed(150);
+                requestCccdWrite();
             } else {
                 System.println("BLE setupCharacteristics: NUS service not found on device");
             }
@@ -643,9 +666,11 @@ class MeshBleManager {
         if (_cccdRetryTimer != null) {
             _cccdRetryTimer.stop();
         } else {
-            _cccdRetryTimer = new Timer.Timer();
+            _cccdRetryTimer = safeTimer();
         }
-        _cccdRetryTimer.start(method(:onCccdTimerFire), delayMs, false);
+        if (_cccdRetryTimer != null) {
+            _cccdRetryTimer.start(method(:onCccdTimerFire), delayMs, false);
+        }
     }
 
     public function onCccdTimerFire() as Void {
@@ -711,11 +736,13 @@ class MeshBleManager {
 
     private function scheduleFragmentTimeout() as Void {
         if (_rxFragmentTimer == null) {
-            _rxFragmentTimer = new Timer.Timer();
+            _rxFragmentTimer = safeTimer();
         } else {
             _rxFragmentTimer.stop();
         }
-        _rxFragmentTimer.start(method(:onFragmentTimeout), 120, false);
+        if (_rxFragmentTimer != null) {
+            _rxFragmentTimer.start(method(:onFragmentTimeout), 120, false);
+        }
     }
 
     public function onFragmentTimeout() as Void {
@@ -744,9 +771,9 @@ class MeshBleManager {
             parseBattery(value);
             if (_syncStage == 1) {
                 if (_isFastSync) {
-                    _syncStage = 6;
-                    System.println("BLE fast session sync: inbox messages");
-                    sendRaw(MeshProtocol.encodeSyncNextMessage());
+                    _syncStage = 3;
+                    System.println("BLE fast session sync stage 3: radio stats query");
+                    sendRaw(MeshProtocol.encodeGetStats(MeshProtocol.STATS_TYPE_RADIO));
                 } else {
                     _syncStage = 2;
                     System.println("BLE session sync stage 2: set device time");
@@ -762,9 +789,9 @@ class MeshBleManager {
         // 2. Stage 1 error fallback (if node doesn't support battery query)
         if (_syncStage == 1 && firstByte == MeshProtocol.RESP_CODE_ERR) {
             if (_isFastSync) {
-                _syncStage = 6;
-                System.println("BLE fast session sync: battery unavailable, requesting inbox");
-                sendRaw(MeshProtocol.encodeSyncNextMessage());
+                _syncStage = 3;
+                System.println("BLE fast session sync: battery unavailable, querying radio stats");
+                sendRaw(MeshProtocol.encodeGetStats(MeshProtocol.STATS_TYPE_RADIO));
             } else {
                 System.println("BLE battery query returned err -> falling back to device time");
                 _syncStage = 2;
@@ -789,20 +816,35 @@ class MeshBleManager {
                 parseCoreStats(value);
             }
             if (_syncStage == 3) {
-                _syncStage = 4;
-                _channelSyncIdx = 0;
-                System.println("BLE session sync stage 4: query channels (0..7)");
-                sendRaw(MeshProtocol.encodeGetChannel(0));
+                if (_isFastSync) {
+                    _syncStage = 6;
+                    System.println("BLE fast session sync stage 6: inbox messages");
+                    sendRaw(MeshProtocol.encodeSyncNextMessage());
+                } else {
+                    _syncStage = 4;
+                    _channelSyncIdx = 0;
+                    System.println("BLE session sync stage 4: query channels (0..7)");
+                    sendRaw(MeshProtocol.encodeGetChannel(0));
+                }
+            } else if (_syncStage == 0 && isConnected) {
+                // Periodic poll: also check inbox messages
+                pollInboxMessages();
             }
             return;
         }
 
         // 5. Stage 3 error fallback (if radio stats query returned error)
         if (_syncStage == 3 && firstByte == MeshProtocol.RESP_CODE_ERR) {
-            _syncStage = 4;
-            _channelSyncIdx = 0;
-            System.println("BLE radio stats query returned err -> continuing to stage 4 (channels)");
-            sendRaw(MeshProtocol.encodeGetChannel(0));
+            if (_isFastSync) {
+                _syncStage = 6;
+                System.println("BLE radio stats query returned err -> continuing fast sync stage 6 (inbox)");
+                sendRaw(MeshProtocol.encodeSyncNextMessage());
+            } else {
+                _syncStage = 4;
+                _channelSyncIdx = 0;
+                System.println("BLE radio stats query returned err -> continuing to stage 4 (channels)");
+                sendRaw(MeshProtocol.encodeGetChannel(0));
+            }
             return;
         }
 
@@ -1075,12 +1117,14 @@ class MeshBleManager {
 
     public function startPeriodicTelemetryTimer() as Void {
         if (_telemetryPollTimer == null) {
-            _telemetryPollTimer = new Timer.Timer();
+            _telemetryPollTimer = safeTimer();
         } else {
             _telemetryPollTimer.stop();
         }
-        _telemetryPollTimer.start(method(:onPeriodicTelemetryPoll), 60000, true);
-        System.println("BLE: 60s periodic telemetry poll timer started");
+        if (_telemetryPollTimer != null) {
+            _telemetryPollTimer.start(method(:onPeriodicTelemetryPoll), 60000, true);
+            System.println("BLE: 60s periodic telemetry poll timer started");
+        }
     }
 
     public function stopPeriodicTelemetryTimer() as Void {
@@ -1412,11 +1456,13 @@ class MeshBleManager {
         _txQueue = newQueue;
 
         if (_txTimeoutTimer == null) {
-            _txTimeoutTimer = new Timer.Timer();
+            _txTimeoutTimer = safeTimer();
         } else {
             _txTimeoutTimer.stop();
         }
-        _txTimeoutTimer.start(method(:onTxTimeout), 2000, false);
+        if (_txTimeoutTimer != null) {
+            _txTimeoutTimer.start(method(:onTxTimeout), 2000, false);
+        }
 
         try {
             _rxCharacteristic.requestWrite(frame, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });

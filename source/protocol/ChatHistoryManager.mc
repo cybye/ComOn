@@ -239,4 +239,25 @@ class ChatHistoryManager {
             return hrs.toString() + "h";
         }
     }
+
+    public static function sanitizeSingleLine(text as String?) as String {
+        if (text == null || text.length() == 0) {
+            return "";
+        }
+        var res = "";
+        var lastWasSpace = false;
+        for (var i = 0; i < text.length(); i++) {
+            var ch = text.substring(i, i + 1);
+            if (ch.equals("\r") || ch.equals("\n") || ch.equals(" ")) {
+                if (!lastWasSpace && res.length() > 0) {
+                    res += " ";
+                    lastWasSpace = true;
+                }
+            } else {
+                res += ch;
+                lastWasSpace = false;
+            }
+        }
+        return res;
+    }
 }
