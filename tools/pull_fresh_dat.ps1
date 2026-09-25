@@ -10,7 +10,7 @@ if ($fenix) {
         if ($data) {
             $item = $data.GetFolder.Items() | Where-Object { $_.Name -eq 'ComOnDatafield.DAT' }
             if ($item) {
-                $targetDir = "C:\Users\cybye\Documents\antigravity\silly-planck\tmp_dat"
+                $targetDir = "tmp_dat"
                 if (Test-Path $targetDir) { Remove-Item -Recurse -Force $targetDir }
                 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
                 $destFolder = $shell.Namespace($targetDir)

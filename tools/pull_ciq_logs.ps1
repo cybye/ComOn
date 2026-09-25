@@ -11,7 +11,7 @@ $garmin = $storage.GetFolder.Items() | Where-Object { $_.Name -eq 'GARMIN' }
 $apps = $garmin.GetFolder.Items() | Where-Object { $_.Name -eq 'Apps' }
 $logs = $apps.GetFolder.Items() | Where-Object { $_.Name -eq 'LOGS' }
 
-$targetDir = "C:\Users\cybye\Documents\antigravity\silly-planck\tmp_logs"
+$targetDir = "tmp_logs"
 if (-not (Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
 $destFolder = $shell.Namespace($targetDir)
 
