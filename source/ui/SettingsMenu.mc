@@ -67,19 +67,20 @@ class NodeSettingsMenu extends WatchUi.Menu2 {
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingSyncNode), I18n.get(Rez.Strings.SettingSyncNodeSub), "SET_SYNC", null));
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingReleaseNode), I18n.get(Rez.Strings.SettingReleaseNodeSub), "SET_RELEASE", null));
         var probeEnabled = Storage.getValue("cfg_bg_scheduler_probe") == true;
-        addItem(new WatchUi.MenuItem("Background Probe", probeEnabled ? "5 min scheduler probe on" : "5 min scheduler probe off", "SET_BG_PROBE", null));
-        addItem(new WatchUi.MenuItem("Last Background Run", getBackgroundRunLabel(), "SET_BG_DIAG", null));
+        var probeSub = I18n.get(probeEnabled ? Rez.Strings.SettingBgProbeOn : Rez.Strings.SettingBgProbeOff);
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingBgProbe), probeSub, "SET_BG_PROBE", null));
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingBgDiag), getBackgroundRunLabel(), "SET_BG_DIAG", null));
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingVirtualNode), I18n.get(Rez.Strings.SettingVirtualNodeSub), "SET_SIM", null));
     }
 
     private function getBackgroundRunLabel() as String {
         var latest = MeshBackgroundDiagnostics.getLatest();
         if (latest == null || !latest.hasKey("outcome") || latest["outcome"] == null) {
-            return "No recorded run";
+            return I18n.get(Rez.Strings.SettingBgNoRun);
         }
         var outcome = latest["outcome"] as String;
         var messages = (latest.hasKey("messages") && latest["messages"] != null) ? (latest["messages"] as Number) : 0;
-        return (outcome.equals("messages")) ? (messages.toString() + " messages") : outcome;
+        return (outcome.equals("messages")) ? I18n.format(Rez.Strings.SettingBgMessages, [ messages ]) : outcome;
     }
 }
 

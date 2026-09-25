@@ -25,6 +25,7 @@ class MeshCoreApp extends Application.AppBase {
 
     private function initForeground() as Void {
         Storage.setValue("cfg_notif_incoming_batch", I18n.get(Rez.Strings.NotifIncomingBatch));
+        Storage.setValue("cfg_notif_incoming_msg", I18n.get(Rez.Strings.NotifIncomingMsg));
         Storage.setValue("cfg_notif_open_chat", I18n.get(Rez.Strings.NotifActionOpenChat));
         Storage.setValue("cfg_notif_open_chats", I18n.get(Rez.Strings.NotifActionOpenChats));
         ContactManager.loadFromStorage();

@@ -10,7 +10,8 @@ class TelemetryDispatcher {
     public var stationaryIntervalSecs as Number = 300;
 
     public var secondsSinceLastSend as Number = 300;
-    public var lastSendStatus as String = "Bereit";
+    public var lastSendStatus as String = "";
+    public var lastSendSuccess as Boolean = false;
     public var totalPacketsSent as Number = 0;
 
     private var _wasStationary as Boolean = false;
@@ -23,6 +24,7 @@ class TelemetryDispatcher {
     }
 
     function initialize() {
+        lastSendStatus = I18n.get(Rez.Strings.DfSubReady);
     }
 
     public function triggerImmediateBeacon() as Void {
@@ -55,12 +57,14 @@ class TelemetryDispatcher {
 
     public function dispatchTelemetry(bleManager as MeshBleManager) as Boolean {
         if (!ContactManager.hasActivityTelemetryTarget()) {
-            lastSendStatus = "Senden Aus";
+            lastSendStatus = I18n.get(Rez.Strings.DfStatusTxOff);
+            lastSendSuccess = false;
             return false;
         }
 
         if (!bleManager.isConnected) {
-            lastSendStatus = "Offline";
+            lastSendStatus = I18n.get(Rez.Strings.TelemetryOff);
+            lastSendSuccess = false;
             return false;
         }
 
@@ -81,7 +85,8 @@ class TelemetryDispatcher {
             false
         );
         var success = bleManager.sendTextToTarget(channelIdx, contactId, text);
-        lastSendStatus = success ? ("Aktivität -> " + targetName) : "Sendefehler";
+        lastSendSuccess = success;
+        lastSendStatus = success ? I18n.format(Rez.Strings.TelSendActivity, [ targetName ]) : I18n.get(Rez.Strings.TelSendError);
 
         if (success) {
             totalPacketsSent++;

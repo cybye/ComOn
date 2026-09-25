@@ -28,7 +28,7 @@ class ContactManager {
     private static var _activityTargetIsContact as Boolean = false;
     private static var _activityTargetChannelIdx as Number = 0;
     private static var _activityTargetContactId as String? = null;
-    private static var _activityTargetName as String = "Senden Aus";
+    private static var _activityTargetName as String = "";
 
     private static var _inFullSync as Boolean = false;
     private static var _syncingChannels as Array<Dictionary> = [] as Array<Dictionary>;
@@ -461,7 +461,7 @@ class ContactManager {
             var stored = Storage.getValue(STORAGE_ACTIVITY_TARGET);
             if (stored == null || !(stored instanceof Dictionary)) {
                 _activityTargetEnabled = false;
-                _activityTargetName = "Senden Aus";
+                _activityTargetName = "";
                 return;
             }
             var target = stored as Dictionary;
@@ -488,7 +488,7 @@ class ContactManager {
                 _activityTargetName = name as String;
             }
             if (!_activityTargetEnabled) {
-                _activityTargetName = "Senden Aus";
+                _activityTargetName = "";
             } else if (_activityTargetIsContact && _activityTargetContactId == null) {
                 _activityTargetIsContact = false;
                 _activityTargetName = "#public";
@@ -520,7 +520,7 @@ class ContactManager {
     public static function disableActivityTelemetryTarget() as Void {
         _activityTargetLoaded = true;
         _activityTargetEnabled = false;
-        _activityTargetName = "Senden Aus";
+        _activityTargetName = "";
         saveActivityTelemetryTarget();
     }
 

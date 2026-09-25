@@ -16,7 +16,7 @@ class MeshBleManager {
     public var isSimulated as Boolean = false;
     public var isSyncing as Boolean = false;
     public var deviceName as String = "Mesh Node";
-    public var lastReceivedMessage as String = "Bereit zum Empfang";
+    public var lastReceivedMessage as String = "";
     public var lastSender as String = "Mesh";
     public var onMessageCallback as (Method(sender as String, text as String, tid as String) as Void)? = null;
 
@@ -972,9 +972,9 @@ class MeshBleManager {
             var errCode = (value.size() > 1) ? value[1] : 0;
             System.println("BLE RESP_CODE_ERR (0x01): node rejected command with err=" + errCode);
             if (WatchUi has :showToast) {
-                var errStr = "Sende-Fehler: Node lehnte ab (" + errCode + ")";
+                var errStr = I18n.format(Rez.Strings.ErrSendRejected, [ errCode ]);
                 if (errCode == 2) {
-                    errStr = "Empfänger nicht erreichbar";
+                    errStr = I18n.get(Rez.Strings.ErrRecipientUnreachable);
                 }
                 WatchUi.showToast(errStr, null);
             }
@@ -1409,7 +1409,7 @@ class MeshBleManager {
             }
             _spoolQueue = [] as Array<Dictionary>;
             if (WatchUi has :showToast) {
-                WatchUi.showToast(sentCount.toString() + " wartende Nachricht(en) gesendet", null);
+                WatchUi.showToast(I18n.format(Rez.Strings.ToastPendingSent, [ sentCount ]), null);
             }
         }
     }

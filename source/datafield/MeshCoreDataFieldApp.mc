@@ -63,7 +63,8 @@ class DataFieldSettingsMenu extends WatchUi.Menu2 {
 
         var activeBadge = I18n.get(Rez.Strings.ActiveBadge);
         var simEnabled = Storage.getValue("sim_virtualNodeEnabled") == true;
-        addItem(new WatchUi.MenuItem("Simulator", simEnabled ? "Ein" : "Aus", "SIM_TOGGLE", null));
+        var simSub = I18n.get(simEnabled ? Rez.Strings.SettingEnabled : Rez.Strings.SettingDisabled);
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.DfMenuSimulator), simSub, "SIM_TOGGLE", null));
 
         var hasTarget = ContactManager.hasActivityTelemetryTarget();
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.DfMenuTxOff), !hasTarget ? activeBadge : null, "TARGET_NONE", null));
@@ -108,7 +109,8 @@ class DataFieldSettingsDelegate extends WatchUi.Menu2InputDelegate {
         if (id.equals("SIM_TOGGLE")) {
             var enabled = Storage.getValue("sim_virtualNodeEnabled") == true;
             Storage.setValue("sim_virtualNodeEnabled", !enabled);
-            WatchUi.showToast("Simulator " + (!enabled ? "aktiviert" : "deaktiviert") + "; Datenfeld neu starten", null);
+            var stateStr = I18n.get(!enabled ? Rez.Strings.SettingEnabled : Rez.Strings.SettingDisabled);
+            WatchUi.showToast(I18n.format(Rez.Strings.DfSimulatorToggleToast, [ stateStr ]), null);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return;
         }

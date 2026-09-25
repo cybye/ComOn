@@ -12,7 +12,7 @@ class KeyboardHelper {
         if (WatchUi has :TextPicker) {
             WatchUi.pushView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(targetId), WatchUi.SLIDE_DOWN);
         } else {
-            WatchUi.showToast("Native TextPicker not available", null);
+            WatchUi.showToast(I18n.get(Rez.Strings.ToastPickerUnavailable), null);
         }
     }
 }

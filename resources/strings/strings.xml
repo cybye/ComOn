@@ -188,4 +188,40 @@
     <string id="SosStartPrompt">START: Send SOS</string>
     <string id="SosBackCancel">BACK: Cancel</string>
     <string id="SosBackClose">BACK: Close</string>
+
+    <!-- Additional Errors & Toasts -->
+    <string id="ErrSendRejected">Send error: Node rejected ($1$)</string>
+    <string id="ErrRecipientUnreachable">Recipient unreachable</string>
+    <string id="ToastPendingSent">$1$ pending message(s) sent</string>
+    <string id="ToastPickerUnavailable">Native text picker not available</string>
+    <string id="ReadyToReceive">Ready to receive</string>
+
+    <!-- Background Diagnostics & Settings -->
+    <string id="SettingBgProbe">Background Probe</string>
+    <string id="SettingBgProbeOn">5 min scheduler probe on</string>
+    <string id="SettingBgProbeOff">5 min scheduler probe off</string>
+    <string id="SettingBgDiag">Last Background Run</string>
+    <string id="SettingBgNoRun">No recorded run</string>
+    <string id="SettingBgMessages">$1$ messages</string>
+
+    <!-- Telemetry Status -->
+    <string id="TelSendActivity">Activity -> $1$</string>
+    <string id="TelSendError">Send error</string>
+
+    <!-- Node Simulator Menu -->
+    <string id="SimMenuTitle">Node Simulator</string>
+    <string id="SimVirtualBle">Virtual BLE Node</string>
+    <string id="SimStatusActive">Active ($1$)</string>
+    <string id="SimStatusDisconnected">Disconnected</string>
+    <string id="SimBufferMsgs">Buffer 3 offline msgs</string>
+    <string id="SimBufferSub">$1$ message(s) in buffer</string>
+    <string id="SimInjectMsg">Inject incoming radio msg</string>
+    <string id="SimInjectSos">Inject SOS emergency</string>
+    <string id="SimInjectContact">New contact (Delta)</string>
+    <string id="SimEchoToggle">Echo / Auto-Reply</string>
+    <string id="SimCycleSignal">Cycle signal status</string>
+    <string id="SimStatusOn">Status: ON</string>
+    <string id="SimStatusOff">Status: OFF</string>
+    <string id="SimStatusOnSignal">Status: ON ($1$)</string>
+    <string id="SimStatusOffline">Disconnected (Offline)</string>
 </strings>

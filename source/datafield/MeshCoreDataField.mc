@@ -301,7 +301,7 @@ class MeshCoreDataField extends WatchUi.DataField {
         var txSubColor = DisplayTheme.muted();
 
         if (isTargetActive) {
-            var isRecent = (disp.secondsSinceLastSend < 20 && (disp.lastSendStatus.find("Aktivit") != null || disp.lastSendStatus.find("vor") != null || disp.lastSendStatus.find("ago") != null));
+            var isRecent = (disp.secondsSinceLastSend < 20 && disp.lastSendSuccess);
             txTitle = "TX: " + _lastTargetText;
             txTitleColor = isRecent ? DisplayTheme.accent() : 0x00d4ff;
             if (isRecent) {

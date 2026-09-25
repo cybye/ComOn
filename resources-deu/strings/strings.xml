@@ -188,4 +188,40 @@
     <string id="SosStartPrompt">START: Notruf starten</string>
     <string id="SosBackCancel">BACK: Abbrechen</string>
     <string id="SosBackClose">BACK: Schließen</string>
+
+    <!-- Additional Errors & Toasts -->
+    <string id="ErrSendRejected">Sende-Fehler: Node lehnte ab ($1$)</string>
+    <string id="ErrRecipientUnreachable">Empfänger nicht erreichbar</string>
+    <string id="ToastPendingSent">$1$ wartende Nachricht(en) gesendet</string>
+    <string id="ToastPickerUnavailable">Natives Texteingabefeld nicht verfügbar</string>
+    <string id="ReadyToReceive">Bereit zum Empfang</string>
+
+    <!-- Background Diagnostics & Settings -->
+    <string id="SettingBgProbe">Hintergrund-Probe</string>
+    <string id="SettingBgProbeOn">5 Min. Scheduler-Probe Ein</string>
+    <string id="SettingBgProbeOff">5 Min. Scheduler-Probe Aus</string>
+    <string id="SettingBgDiag">Letzter Hintergrund-Lauf</string>
+    <string id="SettingBgNoRun">Kein Lauf erfasst</string>
+    <string id="SettingBgMessages">$1$ Nachrichten</string>
+
+    <!-- Telemetry Status -->
+    <string id="TelSendActivity">Aktivität -> $1$</string>
+    <string id="TelSendError">Sendefehler</string>
+
+    <!-- Node Simulator Menu -->
+    <string id="SimMenuTitle">Node-Simulator</string>
+    <string id="SimVirtualBle">Virtuelle Node BLE</string>
+    <string id="SimStatusActive">Aktiv ($1$)</string>
+    <string id="SimStatusDisconnected">Getrennt</string>
+    <string id="SimBufferMsgs">3 Offline-Nachrichten puffern</string>
+    <string id="SimBufferSub">$1$ Nachricht(en) im Puffer</string>
+    <string id="SimInjectMsg">Funkspruch einspeisen</string>
+    <string id="SimInjectSos">SOS Notruf einspeisen</string>
+    <string id="SimInjectContact">Neuer Kontakt (Delta)</string>
+    <string id="SimEchoToggle">Echo / Auto-Reply</string>
+    <string id="SimCycleSignal">Signal durchschalten</string>
+    <string id="SimStatusOn">Status: AN</string>
+    <string id="SimStatusOff">Status: AUS</string>
+    <string id="SimStatusOnSignal">Status: AN ($1$)</string>
+    <string id="SimStatusOffline">Getrennt (Offline)</string>
 </strings>

@@ -108,7 +108,11 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
                     actions.add({ :label => openChatsLabel as String, :data => "ACTION_LIST" });
                 }
                 var notificationTitle = (lastNotificationTitle != null) ? lastNotificationTitle : ("Mesh: " + lastSender);
-                Notifications.showNotification(notificationTitle, "Eingehende Nachricht", { :body => body, :dismissPrevious => true, :actions => actions });
+                var subTitle = Storage.getValue("cfg_notif_incoming_msg");
+                if (subTitle == null) {
+                    subTitle = "Incoming message";
+                }
+                Notifications.showNotification(notificationTitle, subTitle as String, { :body => body, :dismissPrevious => true, :actions => actions });
             } catch (e) {
                 System.println("MeshBackgroundDelegate: notification failed: " + e.getErrorMessage());
             }

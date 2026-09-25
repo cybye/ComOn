@@ -1,6 +1,6 @@
 project.manifest = manifest.xml
 base.sourcePath = source/ble;source/protocol;source/telemetry;source/ui;source/notifications;source/background;source/util;source/MeshCoreApp.mc
-base.resourcePath = resources;resources-deu
+base.resourcePath = resources
 
 # AMOLED targets
 fenix847mm.excludeAnnotations = mip

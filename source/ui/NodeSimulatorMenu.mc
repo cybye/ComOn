@@ -3,23 +3,23 @@ import Toybox.Lang;
 
 class NodeSimulatorMenu {
     public static function create() as WatchUi.Menu2 {
-        var menu = new WatchUi.Menu2({ :title => "Node-Simulator" });
+        var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.SimMenuTitle) });
 
         var bleMgr = getBleManager();
         var vNode = bleMgr.virtualNode;
-        var connSub = bleMgr.isConnected ? "Aktiv (" + bleMgr.deviceName + ")" : "Getrennt";
-        var echoSub = vNode.echoMode ? "Status: AN" : "Status: AUS";
+        var connSub = bleMgr.isConnected ? I18n.format(Rez.Strings.SimStatusActive, [ bleMgr.deviceName ]) : I18n.get(Rez.Strings.SimStatusDisconnected);
+        var echoSub = vNode.echoMode ? I18n.get(Rez.Strings.SimStatusOn) : I18n.get(Rez.Strings.SimStatusOff);
         var bufCount = vNode.getPendingInboxCount();
-        var bufSub = bufCount.toString() + " Nachricht(en) im Puffer";
+        var bufSub = I18n.format(Rez.Strings.SimBufferSub, [ bufCount ]);
 
-        menu.addItem(new WatchUi.MenuItem("Virtuelle Node BLE", connSub, "SIM_CONN", null));
-        menu.addItem(new WatchUi.MenuItem("3 Offline-Nachrichten puffern", bufSub, "SIM_BUFFER", null));
-        menu.addItem(new WatchUi.MenuItem("Funkspruch einspeisen", "Florian: Wegpunkt 3...", "SIM_MSG", null));
-        menu.addItem(new WatchUi.MenuItem("SOS Notruf einspeisen", "Notfall Broadcast", "SIM_SOS", null));
-        menu.addItem(new WatchUi.MenuItem("Neuer Kontakt (Delta)", "Bergwacht Team 2", "SIM_DISCOVER", null));
-        menu.addItem(new WatchUi.MenuItem("Echo / Auto-Reply", echoSub, "SIM_ECHO", null));
-        var sigSub = bleMgr.isConnected ? ("Status: AN (" + bleMgr.getSignalStatusString() + ")") : "Getrennt (Offline)";
-        menu.addItem(new WatchUi.MenuItem("Signal durchschalten", sigSub, "SIM_SIGNAL", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimVirtualBle), connSub, "SIM_CONN", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimBufferMsgs), bufSub, "SIM_BUFFER", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimInjectMsg), "Florian: Wegpunkt 3...", "SIM_MSG", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimInjectSos), "Notfall Broadcast", "SIM_SOS", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimInjectContact), "Bergwacht Team 2", "SIM_DISCOVER", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimEchoToggle), echoSub, "SIM_ECHO", null));
+        var sigSub = bleMgr.isConnected ? I18n.format(Rez.Strings.SimStatusOnSignal, [ bleMgr.getSignalStatusString() ]) : I18n.get(Rez.Strings.SimStatusOffline);
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SimCycleSignal), sigSub, "SIM_SIGNAL", null));
 
         return menu;
     }
