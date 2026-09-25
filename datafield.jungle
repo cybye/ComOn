@@ -1,0 +1,3 @@
+project.manifest = manifest_df.xml
+base.sourcePath = source/ble;source/protocol;source/telemetry/TelemetryAggregator.mc;source/telemetry/TelemetryDispatcher.mc;source/datafield;source/util
+base.resourcePath = resources;resources-deu

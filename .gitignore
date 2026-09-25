@@ -1,0 +1,26 @@
+# Garmin Connect IQ Build Artifacts
+bin/
+*.prg
+*.iq
+
+# Sensitive Keys and Credentials
+developer_key.der
+*.der
+*.key
+*.pem
+
+# Temporary Data, Simulator Logs & Caches
+tmp_*/
+*.log
+*.dat
+
+# IDE and Editor Directories
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Connect IQ",
+            "stopAtEntry": false
+        },
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "MeshCore (Fenix 8 47mm)",
+            "stopAtEntry": false,
+            "device": "fenix847mm"
+        }
+    ]
+}
