@@ -8,6 +8,12 @@
 
 **This app currently only connects with a patched meshcore firmware. PIN authentication is not supported by Connect IQ and missing message chunking in the standard meshcore firmware limits functionality.**
 
+## Screenshots
+
+![Main](docs/main.png) ![Chat](docs/channel.png)  
+
+
+
 ## Key Features
 
 - **Decentralized Messaging:**
