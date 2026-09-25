@@ -7,14 +7,6 @@ class SettingsMenu extends WatchUi.Menu2 {
     function initialize() {
         Menu2.initialize({ :title => I18n.get(Rez.Strings.SettingsTitle) });
 
-        var currentKeyMode = "QWERTY (Touch)";
-        try {
-            currentKeyMode = KeyboardHelper.getModeName(KeyboardHelper.getKeyboardMode());
-        } catch (e) {
-            System.println("SettingsMenu: error reading keyboard mode");
-        }
-        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingKeyboardType), currentKeyMode, "SET_KEYBOARD", null));
-        
         // Background check interval (defensive)
         var bgInt = 300;
         try {
@@ -101,8 +93,6 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
         var bleManager = getBleManager();
         if (id.equals("SET_NODE_MENU")) {
             WatchUi.pushView(new NodeSettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("SET_KEYBOARD")) {
-            WatchUi.pushView(KeyboardSettingsMenu.create(), new KeyboardSettingsDelegate(), WatchUi.SLIDE_LEFT);
         } else if (id.equals("SET_BG_INTERVAL")) {
             var current = Storage.getValue("bgInterval");
             if (!(current instanceof Number)) { current = 300; }

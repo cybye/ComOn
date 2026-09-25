@@ -1,0 +1,9 @@
+<layout id="SosActiveLayout">
+    <label id="SosActiveHeader" x="center" y="13%" font="Graphics.FONT_SYSTEM_TINY" color="Graphics.COLOR_RED" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+    <label id="SosCardTitle" x="center" y="27%" font="Graphics.FONT_SYSTEM_XTINY" color="Graphics.COLOR_RED" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+    <label id="SosPosRow" x="center" y="39%" font="Graphics.FONT_SYSTEM_XTINY" color="Graphics.COLOR_YELLOW" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+    <label id="SosVitalsRow" x="center" y="52%" font="Graphics.FONT_SYSTEM_XTINY" color="Graphics.COLOR_WHITE" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+    <label id="SosChannelRow" x="center" y="65%" font="Graphics.FONT_SYSTEM_XTINY" color="Graphics.COLOR_LT_GRAY" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+    <label id="SosBeaconRow" x="center" y="78%" font="Graphics.FONT_SYSTEM_XTINY" color="Graphics.COLOR_GREEN" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+    <label id="SosCloseHint" x="center" y="90%" font="Graphics.FONT_SYSTEM_XTINY" color="Graphics.COLOR_LT_GRAY" justification="Graphics.TEXT_JUSTIFY_CENTER" />
+</layout>

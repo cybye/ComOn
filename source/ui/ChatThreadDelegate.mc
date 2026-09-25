@@ -39,25 +39,27 @@ class ChatThreadDelegate extends WatchUi.InputDelegate {
         System.println("ChatThread: onTap at [" + tx + ", " + ty + "]");
 
         // Top header tap -> Open Node Settings
-        if (ty <= 60) {
+        if (ty <= _view.getHeaderTapLimit()) {
             System.println("ChatThread: Header tapped -> opening NodeSettingsMenu");
             getBleManager().suspendDiscoveryForUi();
             WatchUi.pushView(new NodeSettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_UP);
             return true;
         }
 
-        // Bottom [Message / Nachricht] pill button bounds
-        if (ty >= 365 && tx >= 60 && tx <= 394) {
-            System.println("ChatThread: Message pill button clicked -> opening keyboard");
-            KeyboardHelper.openKeyboardForTarget("", _view.targetId);
+        // Bottom [Message / Nachricht] pill button bounds -> opens standard replies menu
+        if (_view.isPillTapped(tx, ty)) {
+            System.println("ChatThread: Message pill button clicked -> opening CannedMessageMenu");
+            WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_LEFT);
             return true;
         }
 
         // Tap in upper/middle area: if tapped top half, scroll up; bottom half, scroll down
-        if (ty > 60 && ty < 215) {
+        var headerLim = _view.getHeaderTapLimit();
+        var halfY = DisplayProfile.screenH / 2;
+        if (ty > headerLim && ty < halfY) {
             _view.scrollUp();
             return true;
-        } else if (ty >= 215 && ty < 365) {
+        } else if (ty >= halfY) {
             _view.scrollDown();
             return true;
         }

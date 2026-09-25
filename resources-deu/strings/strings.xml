@@ -43,7 +43,7 @@
     <string id="MenuSos">SOS Notruf</string>
     <string id="MenuSosSub">Notfall Broadcast</string>
     <string id="MenuSettings">Einstellungen</string>
-    <string id="MenuSettingsSub">Tastatur, Node...</string>
+    <string id="MenuSettingsSub">Node, FIT Log, Telemetrie...</string>
     <string id="MenuExit">App beenden</string>
     <string id="NoChats">Keine Chats vorhanden</string>
 
@@ -82,7 +82,6 @@
 
     <!-- Settings -->
     <string id="SettingsTitle">Einstellungen</string>
-    <string id="SettingKeyboardType">Tastatur-Typ</string>
     <string id="SettingBgCheck">Hintergrund-Prüfung</string>
     <string id="SettingBgCheckSub">$1$ min</string>
     <string id="SettingBgDisabled">Aus</string>

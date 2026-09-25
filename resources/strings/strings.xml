@@ -43,7 +43,7 @@
     <string id="MenuSos">SOS Emergency</string>
     <string id="MenuSosSub">Emergency broadcast</string>
     <string id="MenuSettings">Settings</string>
-    <string id="MenuSettingsSub">Keyboard, Node...</string>
+    <string id="MenuSettingsSub">Node, FIT Log, Telemetry...</string>
     <string id="MenuExit">Exit App</string>
     <string id="NoChats">No chats found</string>
 
@@ -82,7 +82,6 @@
 
     <!-- Settings -->
     <string id="SettingsTitle">Settings</string>
-    <string id="SettingKeyboardType">Keyboard Type</string>
     <string id="SettingBgCheck">Background Check</string>
     <string id="SettingBgCheckSub">$1$ min</string>
     <string id="SettingBgDisabled">Off</string>

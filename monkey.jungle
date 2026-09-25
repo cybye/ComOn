@@ -1,2 +1,20 @@
 project.manifest = manifest.xml
 base.sourcePath = source/ble;source/protocol;source/telemetry;source/ui;source/notifications;source/background;source/util;source/MeshCoreApp.mc
+base.resourcePath = resources;resources-deu
+
+# AMOLED targets
+fenix847mm.excludeAnnotations = mip
+fenix847mm.resourcePath = $(base.resourcePath);resources-amoled;resources-round-454x454
+
+fenix843mm.excludeAnnotations = mip
+fenix843mm.resourcePath = $(base.resourcePath);resources-amoled;resources-round-416x416
+
+fenix8pro47mm.excludeAnnotations = mip
+fenix8pro47mm.resourcePath = $(base.resourcePath);resources-amoled;resources-round-454x454
+
+# MIP Solar targets
+fenix8solar47mm.excludeAnnotations = amoled
+fenix8solar47mm.resourcePath = $(base.resourcePath);resources-mip;resources-round-260x260
+
+fenix8solar51mm.excludeAnnotations = amoled
+fenix8solar51mm.resourcePath = $(base.resourcePath);resources-mip;resources-round-280x280

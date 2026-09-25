@@ -73,9 +73,9 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         var ty = coords[1];
         System.println("ChatsListDelegate: onTap [" + tx + ", " + ty + "]");
 
-        // Option A Crown Header tap (top area: y <= 110)
+        // Option A Crown Header tap (top area: scaled 110)
         // Directly opens Node Settings / Node Info Menu!
-        if (ty <= 110) {
+        if (ty <= DisplayProfile.scale(110)) {
             System.println("ChatsListDelegate: Crown header tapped -> opening NodeSettingsMenu");
             getBleManager().suspendDiscoveryForUi();
             WatchUi.pushView(new NodeSettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_UP);
@@ -83,7 +83,7 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         }
 
         // Left bezel edge tap (9 o'clock) -> Open Main Menu
-        if (tx <= 85 && ty >= 170 && ty <= 285) {
+        if (tx <= DisplayProfile.scale(85) && ty >= DisplayProfile.scale(170) && ty <= DisplayProfile.scale(285)) {
             System.println("ChatsListDelegate: 9 o'clock bezel edge tapped -> opening Main Menu");
             openMainMenu();
             return true;
@@ -124,9 +124,43 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.MenuTitle) });
         var targetLabel = I18n.format(Rez.Strings.MenuActiveTarget, [ ContactManager.getTargetDisplayName() ]);
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuChats), targetLabel, "MENU_CHATS", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendMsg), I18n.get(Rez.Strings.MenuSendMsgSub), "MENU_SEND_MSG", null));
+        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendPosition), I18n.get(Rez.Strings.MenuSendPositionSub), "MENU_SEND_POS", null));
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSos), I18n.get(Rez.Strings.MenuSosSub), "MENU_SOS", null));
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSettings), I18n.get(Rez.Strings.MenuSettingsSub), "MENU_SETTINGS", null));
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuExit), null, "MENU_EXIT", null));
         WatchUi.pushView(menu, new MainMenuDelegate(), WatchUi.SLIDE_LEFT);
     }
 }
+
+class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
+    function initialize() {
+        Menu2InputDelegate.initialize();
+    }
+
+    public function onSelect(item as WatchUi.MenuItem) as Void {
+        var id = item.getId() as String;
+        if (id.equals("MENU_CHATS")) {
+            WatchUi.pushView(ChatsMenu.create(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
+        } else if (id.equals("MENU_SEND_MSG")) {
+            WatchUi.pushView(CannedMessageMenu.create(), new CannedMessageDelegate(null), WatchUi.SLIDE_LEFT);
+        } else if (id.equals("MENU_SEND_POS")) {
+            var sent = getBleManager().sendCurrentPosition(ContactManager.selectedChannelIdx);
+            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            WatchUi.showToast(sent ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected), null);
+        } else if (id.equals("MENU_SOS")) {
+            var sos = new SosCountdownView();
+            WatchUi.pushView(sos, new SosCountdownDelegate(), WatchUi.SLIDE_UP);
+        } else if (id.equals("MENU_SETTINGS")) {
+            WatchUi.pushView(new SettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_LEFT);
+        } else if (id.equals("MENU_EXIT")) {
+            System.exit();
+        }
+    }
+
+    public function onBack() as Void {
+        WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        getBleManager().resumeDiscoveryAfterUi();
+    }
+}
+
