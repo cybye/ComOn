@@ -12,7 +12,7 @@ class KeyboardHelper {
         if (WatchUi has :TextPicker) {
             WatchUi.pushView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(targetId), WatchUi.SLIDE_DOWN);
         } else {
-            WatchUi.showToast("Natives Rad nicht verfuegbar", null);
+            WatchUi.showToast("Native TextPicker not available", null);
         }
     }
 }
