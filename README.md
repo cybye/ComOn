@@ -4,7 +4,7 @@
 [![Connect IQ](https://img.shields.io/badge/Connect_IQ-v5.1%2B-blue)](https://developer.garmin.com/connect-iq/)
 [![Platform](https://img.shields.io/badge/Garmin-F%C3%A9nix%208-orange)](manifest.xml)
 
-**ComOn** is a full-featured Garmin Connect IQ watch app and telemetry companion designed for off-grid LoRa mesh networks (such as MeshCore / Nordic BLE UART nodes). It provides standalone two-way tactical messaging, real-time node monitoring, emergency beaconing (SOS), and background inbox synchronisation directly on Garmin multisport smartwatches.
+**ComOn** is a full-featured Garmin Connect IQ watch app and telemetry companion designed for off-grid LoRa mesh networks (such as MeshCore nodes). It provides standalone two-way tactical messaging, real-time node monitoring, emergency beaconing (SOS), and background inbox synchronisation directly on Garmin multisport smartwatches.
 
 **This app currently only connects with a patched meshcore firmware. PIN authentication is not supported by Connect IQ and missing message chunking in the standard meshcore firmware limits functionality.**
 
@@ -14,9 +14,6 @@
   - Full channel and direct message (1:1) chat views.
   - Interactive multi-line chat bubbles with timestamps, unread badges, and delivery states.
   - Canned quick replies, direct text input, and location sharing.
-- **On-Screen Full Touch Keyboards:**
-  - Full-screen touch-optimized QWERTY and QWERTZ keyboards with visual key taps and tactile haptic feedback.
-  - Native system text-picker fallback.
 - **Resilient BLE Protocol Stack:**
   - Seamless auto-reconnect and session synchronisation via Nordic UART Service (NUS).
   - Multi-tier background syncing, auto inbox polling, and low-battery alerts for remote nodes.
