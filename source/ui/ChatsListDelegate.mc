@@ -122,10 +122,6 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         }
         getBleManager().suspendDiscoveryForUi();
         var menu = new WatchUi.Menu2({ :title => I18n.get(Rez.Strings.MenuTitle) });
-        var targetLabel = I18n.format(Rez.Strings.MenuActiveTarget, [ ContactManager.getTargetDisplayName() ]);
-        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuChats), targetLabel, "MENU_CHATS", null));
-        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendMsg), I18n.get(Rez.Strings.MenuSendMsgSub), "MENU_SEND_MSG", null));
-        menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSendPosition), I18n.get(Rez.Strings.MenuSendPositionSub), "MENU_SEND_POS", null));
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSos), I18n.get(Rez.Strings.MenuSosSub), "MENU_SOS", null));
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuSettings), I18n.get(Rez.Strings.MenuSettingsSub), "MENU_SETTINGS", null));
         menu.addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.MenuExit), null, "MENU_EXIT", null));
@@ -140,15 +136,7 @@ class MainMenuDelegate extends WatchUi.Menu2InputDelegate {
 
     public function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
-        if (id.equals("MENU_CHATS")) {
-            WatchUi.pushView(ChatsMenu.create(), new ChatsDelegate(), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_SEND_MSG")) {
-            WatchUi.pushView(CannedMessageMenu.create(), new CannedMessageDelegate(null), WatchUi.SLIDE_LEFT);
-        } else if (id.equals("MENU_SEND_POS")) {
-            var sent = getBleManager().sendCurrentPosition(ContactManager.selectedChannelIdx);
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            WatchUi.showToast(sent ? I18n.get(Rez.Strings.ToastPositionSent) : I18n.get(Rez.Strings.ToastNotConnected), null);
-        } else if (id.equals("MENU_SOS")) {
+        if (id.equals("MENU_SOS")) {
             var sos = new SosCountdownView();
             WatchUi.pushView(sos, new SosCountdownDelegate(), WatchUi.SLIDE_UP);
         } else if (id.equals("MENU_SETTINGS")) {
