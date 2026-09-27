@@ -93,7 +93,7 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
             if (pct <= 15) {
                 if (Storage.getValue(STORAGE_LOW_BATTERY_NOTIFIED) != true) {
                     try {
-                        Notifications.showNotification("ComOn", "Node Akku low", { :body => "MeshCore Node Akku low at " + pct + "%", :dismissPrevious => false });
+                        Notifications.showNotification("ComOn", "Node Battery low", { :body => "MeshCore Node battery low at " + pct + "%", :dismissPrevious => false });
                         Storage.setValue(STORAGE_LOW_BATTERY_NOTIFIED, true);
                         System.println("MeshBackgroundDelegate: posted low-battery notification (" + pct + "%)");
                     } catch (e) {

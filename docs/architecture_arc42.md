@@ -330,6 +330,47 @@ POS: <LAT>,<LON> | <ALT> | HF:<HR> | <SPEED> [STAT]
 | `2` | `mesh_nodes` | `UINT8` | `Record` | `nodes` | Aktive Mesh Knoten |
 | `3` | `mesh_bat` | `UINT8` | `Record` | `%` | Node Akkustand |
 
+### 8.4 Multi-Display-Architektur (AMOLED & Solar MIP)
+
+Zur lückenlosen Unterstützung der gesamten Fénix-8-Produktfamilie (hochaufgelöste 24-Bit-AMOLED-Displays sowie transflektive 64-Farben-MIP-Displays mit Solarladung) implementiert `ComOn` eine vierstufige Differenzierungsstrategie.
+
+```mermaid
+flowchart TD
+    subgraph BuildTime["Build-Time (Monkey Jungle Annotations)"]
+        Jungle["monkey.jungle / datafield.jungle"]
+        AmoledTarget["fenix847mm / fenix843mm / fenix8pro47mm"] -->|exclude: mip| AmoledCode["DisplayTheme (:amoled)<br/>24-Bit Slate Palette"]
+        MipTarget["fenix8solar47mm / fenix8solar51mm"] -->|exclude: amoled| MipCode["DisplayTheme (:mip)<br/>High-Contrast 64-Color Palette"]
+    end
+
+    subgraph Runtime["Runtime Display Adaptation"]
+        Dc["dc (Graphics.Dc)"] --> DP["DisplayProfile.init(dc)"]
+        DP --> Scaling["DisplayProfile.scale(px)"]
+        DP --> Chord["DisplayProfile.chordW(y)"]
+        Scaling --> Views["ChatsListView / ChatThreadView / DataField"]
+        DP --> VF["Graphics.getVectorFont({:size => scale(pt)})"]
+        VF --> CachedFonts["_fontBody / _fontCaption<br/>(Cached in onLayout)"]
+        CachedFonts --> Render["onUpdate(dc) Fast Canvas Render"]
+    end
+```
+
+#### 1. Display-Matrix & Zielgeräte
+| Bucket | Geräte | Display-Technologie | Auflösung | Jungle Annotation | Skalierungsfaktor vs. 454 |
+|---|---|---|---|---|---|
+| **A: Large AMOLED** | `fenix847mm`, `fenix8pro47mm` | AMOLED (24-Bit True Color) | $454 \times 454$ px | `:amoled` | $1.00$ (Referenz-Basis) |
+| **B: Compact AMOLED**| `fenix843mm` | AMOLED (24-Bit True Color) | $416 \times 416$ px | `:amoled` | $0.92$ |
+| **C: MIP Solar 47mm** | `fenix8solar47mm` | Transflektiv MIP (64 Farben) | $260 \times 260$ px | `:mip` | $0.57$ |
+| **C: MIP Solar 51mm** | `fenix8solar51mm` | Transflektiv MIP (64 Farben) | $280 \times 280$ px | `:mip` | $0.62$ |
+
+#### 2. Vierstufige Differenzierungsstrategie
+1. **Stufe 1 – Deklarative OS-Layouts (`%`-Positionierung):**
+   Statische Text- und Metadaten-Ansichten (wie `SosCountdownLayout`, `SosActiveLayout` sowie die Datenfeld-Layouts) nutzen Prozentangaben (`x="center"`, `y="16%"`). Die Connect IQ Layout-Engine passt Koordinaten nativ und ohne Code-Overhead an jede Displayauflösung an.
+2. **Stufe 2 – Compile-Time Annotationen (`:amoled` vs. `:mip`):**
+   Farbpaletten, Rahmenradien und Stiftbreiten werden in `DisplayTheme.mc` über Compile-Time-Tags gesteuert. Das Jungle-Build-System schließt nicht zutreffende Varianten via `excludeAnnotations` vollständig aus dem Binary aus. Dunkle Schiefer- und Slate-Töne (`0x151b24`, `0x2a3647`), die auf 64-Farben-MIP-Panels zu reinem Schwarz absaufen würden, werden für MIP-Targets durch kontrastreiches `COLOR_BLACK`, `COLOR_LT_GRAY` und `COLOR_GREEN` ersetzt – ohne Runtime-Branches.
+3. **Stufe 3 – Runtime-Geometrie (`DisplayProfile.scale()`) & Native System-Fonts:**
+   Dynamische Canvas-Ansichten (`ChatsListView`, `ChatThreadView`) skalieren relative Pixelmaße und Insets über `DisplayProfile.scale(px)`. Textgrößen nutzen Garmins native, gerätespezifisch vorkalibrierte System-Fonts (`FONT_SYSTEM_TINY` für Titel/Header, `FONT_SYSTEM_XTINY` für Untertitel/Vorschau). Dies garantiert optimale Lesbarkeit, hohe Schriftdicke und null Heap-Allokation sowohl auf 454-px-AMOLED (wo `FONT_SYSTEM_TINY` ca. 30 px hoch und kontraststark ist) als auch auf 260-px-MIP (wo Firmware-Bitmap-Fonts ohne unscharfes Anti-Aliasing gerendert werden).
+4. **Stufe 4 – Performante Text-Einpassung:**
+   Aufwendige Frame-by-Frame-Zeichenkürzungs-Schleifen wurden durch eine binäre Kürzungsfunktion (`truncateText`) ersetzt, die Textlängen in $\mathcal{O}(\log N)$ ohne unnötige Heap-Allokationen exakt auf die verfügbare Kartenbreite zuschneidet.
+
 ---
 
 ## 9. Architekturentscheidungen (ADR)
@@ -536,6 +577,16 @@ POS: <LAT>,<LON> | <ALT> | HF:<HR> | <SPEED> [STAT]
    3. *Background Ownership*: Der Temporal Service startet als eigenständige BLE-Laufzeit, selektiert die App-Bond-Liste und verarbeitet höchstens fünf Inbox-Nachrichten. Die Node gilt erst nach erfolgreichem CCCD-Write als erreichbar. Jeder Callback führt zu einem Zustandsfortschritt oder einem idempotenten Abschluss mit `Background.exit()`.
    4. *Foreground-Konflikt*: Ein realer Background-BLE-Poll läuft nicht parallel zu einer aktiven Foreground-Verbindung. Der 5-Minuten Scheduler-Probe testet bei geöffneter App nur den Service-Lifecycle und dokumentiert das Ergebnis, ohne BLE zu beanspruchen.
    5. *Diagnostik*: `cfg_bg_diagnostics_v1` speichert Run-ID, Auslöser, Endzustand, Ergebnis, Verbindungsstatus und Anzahl empfangener Nachrichten. Node Settings zeigt den letzten Run und erlaubt das Umschalten des Scheduler-Probes.
+* **ADR 37: Multi-Device Display-Architektur & Compile-Time Differenzierung (`:amoled` vs. `:mip`):**
+   1. *Kontext & Problemstellung*:
+      `ComOn` muss sowohl Fénix 8 AMOLED-Displays ($454 \times 454$ px, $416 \times 416$ px) als auch Solar-MIP-Displays ($260 \times 260$ px, $280 \times 280$ px) unterstützen. Laufzeitprüfungen auf Displaytypen (wie `requiresBurnInProtection`) sind indirekt und fehleranfällig. Dunkle Schiefergrau-Töne der AMOLED-Farbpalette verschmelzen auf 64-Farben-MIP-Displays zu unleserlichem Schwarz. Zudem überlappen feste Pixelkoordinaten auf kleineren MIP-Displays und in 2-/3-Feld-Datenfeld-Layouts.
+   2. *Lösung & Implementierung*:
+      - **Build-Time Differenzierung:** Geräte werden über `excludeAnnotations` in `monkey.jungle` und `datafield.jungle` strikt in `:amoled` und `:mip` getrennt. `DisplayTheme.mc` stellt typensichere Compile-Time-Farbkonstanten (`cardBg()`, `cardBorder()`, `accent()`, `muted()`) bereit; inaktive Zweige werden vom Linker vollständig eliminiert.
+      - **Geometrie-Skalierung:** `DisplayProfile.scale(px)` skaliert relative Pixelmaße bezogen auf die 454-px-Referenzbasis dynamisch zur Laufzeit anhand von `dc.getWidth()`.
+      - **Stufenlose Vektor-Fonts:** In Canvas-Ansichten (`ChatsListView`, `ChatThreadView`) werden Vektor-Fonts (`Graphics.getVectorFont`) mit proportionaler Punktgröße in `onLayout()` allokiert und in `onUpdate()` wiederverwendet.
+      - **Zwei-Phasen-SOS:** Aufteilung in `SosCountdownView` (mit deklarativem `SosCountdownLayout.xml`) und `SosActiveView` (mit `SosActiveLayout.xml`), gekoppelt über `WatchUi.switchToView` für saubere Stack-Hygiene.
+      - **Datenfeld-Multilayout:** Automatische Umschaltung zwischen 2-Zeilen-Kompaktansicht für Split-Screens (`height < 180`) und 5-Stufen-Vollansicht für Einzelfeld-Trainingsseiten.
+      - **Code-Bereinigung:** Vollständiges Entfernen der ungenutzten Custom-QWERTY-Tastaturkomponenten und des veralteten `DashboardView`. Text-Eingaben nutzen direkt Garmins natives `TextPicker`-Rad.
 
 ---
 

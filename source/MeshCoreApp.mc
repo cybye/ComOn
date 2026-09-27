@@ -43,6 +43,10 @@ class MeshCoreApp extends Application.AppBase {
         ContactManager.loadFromStorage();
         ContactManager.ensureBackgroundIdentityCaches();
         ChatHistoryManager.reloadFromStorage();
+        // Register notification handler before BLE setup so that action buttons
+        // are never stripped from notifications that arrive during early connect
+        // (i.e. before ChatsListView.onShow() has had a chance to call register()).
+        MeshNotificationManager.getInstance().register();
         if (_bleManager == null) {
             _bleManager = new MeshBleManager();
             _bleDelegate = new MeshBleDelegate(_bleManager as MeshBleManager);
