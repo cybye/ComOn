@@ -14,13 +14,22 @@ class MeshCoreApp extends Application.AppBase {
     private var _bleManager as MeshBleManager? = null;
     private var _bleDelegate as MeshBleDelegate? = null;
     private var _isForeground as Boolean = false;
+    private var _launchAction as String? = null;
+    private var _heartbeatTimer as SoftTimer? = null;
 
     (:background)
     function initialize() {
         AppBase.initialize();
     }
 
+    (:background)
     function onStart(state as Dictionary?) as Void {
+        if (state != null && state.hasKey(:launchedFromNotification)) {
+            var action = state.get(:launchedFromNotification);
+            if (action instanceof String) {
+                _launchAction = action as String;
+            }
+        }
     }
 
     private function initForeground() as Void {
@@ -28,8 +37,12 @@ class MeshCoreApp extends Application.AppBase {
         Storage.setValue("cfg_notif_incoming_msg", I18n.get(Rez.Strings.NotifIncomingMsg));
         Storage.setValue("cfg_notif_open_chat", I18n.get(Rez.Strings.NotifActionOpenChat));
         Storage.setValue("cfg_notif_open_chats", I18n.get(Rez.Strings.NotifActionOpenChats));
+        Storage.setValue("cfg_notif_reply", I18n.get(Rez.Strings.NotifActionReply));
+        Storage.setValue("cfg_notif_position", I18n.get(Rez.Strings.NotifActionPosition));
+        Storage.setValue("cfg_notif_ok", I18n.get(Rez.Strings.NotifActionOk));
         ContactManager.loadFromStorage();
         ContactManager.ensureBackgroundIdentityCaches();
+        ChatHistoryManager.reloadFromStorage();
         if (_bleManager == null) {
             _bleManager = new MeshBleManager();
             _bleDelegate = new MeshBleDelegate(_bleManager as MeshBleManager);
@@ -43,7 +56,6 @@ class MeshCoreApp extends Application.AppBase {
             (_bleManager as MeshBleManager).sosProvider = method(:getFormattedSos);
         }
         TelemetryProvider.getInstance().startTracking();
-        MeshNotificationManager.getInstance().register();
     }
 
     public function getFormattedPosition() as String {
@@ -59,8 +71,13 @@ class MeshCoreApp extends Application.AppBase {
     }
 
     function onStop(state as Dictionary?) as Void {
+        if (_heartbeatTimer != null) {
+            _heartbeatTimer.stop();
+            _heartbeatTimer = null;
+        }
         if (_isForeground) {
             Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
+            Storage.deleteValue("cfg_foreground_active_at");
         }
         if (!(Toybox has :WatchUi) || _bleManager == null) {
             return;
@@ -106,9 +123,23 @@ class MeshCoreApp extends Application.AppBase {
     function getInitialView() as [Views] or [Views, InputDelegates] {
         _isForeground = true;
         Storage.setValue(STORAGE_FOREGROUND_ACTIVE, true);
+        onForegroundHeartbeat();
+        if (_heartbeatTimer == null) {
+            _heartbeatTimer = new SoftTimer();
+            _heartbeatTimer.start(method(:onForegroundHeartbeat), 60000, true);
+        }
         initForeground();
+        if (_launchAction != null) {
+            // Handled from ChatsListView.onShow once the view stack exists
+            MeshNotificationManager.getInstance().setPendingLaunchAction(_launchAction as String);
+            _launchAction = null;
+        }
         var view = new ChatsListView();
         return [ view, new ChatsListDelegate(view) ];
+    }
+
+    public function onForegroundHeartbeat() as Void {
+        Storage.setValue("cfg_foreground_active_at", Time.now().value());
     }
 
     public function getBleManager() as MeshBleManager {

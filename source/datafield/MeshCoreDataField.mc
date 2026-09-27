@@ -13,6 +13,7 @@ class MeshCoreDataField extends WatchUi.DataField {
     private var _batField as FitContributor.Field?;
 
     private var _fitLoggingEnabled as Boolean = true;
+    private var _dbgFitStatus as String = "FIT: init";
     private var _lastTargetText as String = "#public";
     private var _dataPointsCaptured as Number = 0;
     private var _timerState as Number = 0; // 0=Stopped/Off, 1=Recording, 2=Paused
@@ -44,13 +45,16 @@ class MeshCoreDataField extends WatchUi.DataField {
                 if (_peersField != null) { _peersField.setData(0.0); }
                 if (_batField != null)  { _batField.setData(0.0); }
 
+                _dbgFitStatus = "FIT: OK";
                 Storage.setValue("dbg_fit_init", "ok");
                 System.println("MeshCoreDataField: FitContributor fields initialized successfully (4 record float)");
             } catch (e) {
+                _dbgFitStatus = "FIT Err: " + e.getErrorMessage();
                 Storage.setValue("dbg_fit_init", "err: " + e.getErrorMessage());
                 System.println("MeshCoreDataField: FitContributor init EXCEPTION: " + e.getErrorMessage());
             }
         } else {
+            _dbgFitStatus = "FIT: Off";
             Storage.setValue("dbg_fit_init", "disabled");
             System.println("MeshCoreDataField: FitContributor is disabled via Storage setting");
         }
@@ -60,6 +64,17 @@ class MeshCoreDataField extends WatchUi.DataField {
         System.println("MeshCoreDataField: onTimerStart() event received from OS");
         _timerState = 1;
         TelemetryDispatcher.getInstance().triggerImmediateBeacon();
+        if (_fitLoggingEnabled) {
+            try {
+                if (_rssiField != null) { _rssiField.setData(0.0); }
+                if (_snrField != null)  { _snrField.setData(0.0); }
+                if (_peersField != null) { _peersField.setData(0.0); }
+                if (_batField != null)  { _batField.setData(0.0); }
+                System.println("MeshCoreDataField: onTimerStart wrote initial zero seed data to FIT fields");
+            } catch (e) {
+                System.println("MeshCoreDataField: onTimerStart setData exception: " + e.getErrorMessage());
+            }
+        }
     }
 
     public function onTimerStop() as Void {
@@ -270,13 +285,15 @@ class MeshCoreDataField extends WatchUi.DataField {
             if (_timerState == 1) {
                 recTitle = I18n.get(Rez.Strings.DfStatusRecording);
                 recTitleColor = DisplayTheme.accent();
-                recSub = I18n.format(Rez.Strings.DfSubPointsCaptured, [ _dataPointsCaptured ]);
+                recSub = I18n.format(Rez.Strings.DfSubPointsCaptured, [ _dataPointsCaptured ]) + " (" + _dbgFitStatus + ")";
                 recSubColor = DisplayTheme.accent();
             } else if (_timerState == 2) {
                 recTitle = I18n.get(Rez.Strings.DfStatusPaused);
                 recTitleColor = 0xffea00;
                 recSub = I18n.get(Rez.Strings.DfSubActivityPaused);
                 recSubColor = DisplayTheme.muted();
+            } else {
+                recSub = _dbgFitStatus;
             }
         }
 

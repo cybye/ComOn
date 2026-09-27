@@ -11,6 +11,7 @@ class MeshCoreDataFieldApp extends Application.AppBase {
 
     function initialize() {
         AppBase.initialize();
+        ContactManager.setIsDataFieldMode(true);
         ContactManager.loadFromStorage();
         _bleManager = new MeshBleManager();
         _bleManager.setIsDataField(true);

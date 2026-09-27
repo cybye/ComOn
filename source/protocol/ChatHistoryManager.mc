@@ -13,6 +13,11 @@ class ChatHistoryManager {
     public static const STATUS_SENT_NODE as Number      = 1; // Node acknowledged receipt via BLE (Single check ✓)
     public static const STATUS_CONFIRMED_MESH as Number = 2; // Node confirmed radio mesh broadcast via LoRa (Double check ✓✓)
 
+    public static function reloadFromStorage() as Void {
+        _initialized = false;
+        initializeHistory();
+    }
+
     public static function initializeHistory() as Void {
         if (_initialized) {
             return;
@@ -26,22 +31,24 @@ class ChatHistoryManager {
                 var loaded = [] as Array<Dictionary>;
                 for (var i = 0; i < list.size(); i++) {
                     var it = list[i];
-                    var isOut = (it["isOutgoing"] != null) ? (it["isOutgoing"] as Boolean) : false;
-                    var storedRead = it["isRead"];
-                    var isRead = (storedRead instanceof Boolean) ? (storedRead as Boolean) : isOut;
-                    var st = it["status"];
-                    if (st == null) {
-                        st = isOut ? STATUS_CONFIRMED_MESH : 0;
+                    var tid = it.hasKey("targetId") ? it["targetId"] : (it.hasKey(:targetId) ? it[:targetId] : null);
+                    var snd = it.hasKey("sender") ? it["sender"] : (it.hasKey(:sender) ? it[:sender] : null);
+                    var txt = it.hasKey("text") ? it["text"] : (it.hasKey(:text) ? it[:text] : null);
+                    var isOut = it.hasKey("isOutgoing") ? (it["isOutgoing"] as Boolean) : (it.hasKey(:isOutgoing) ? (it[:isOutgoing] as Boolean) : false);
+                    var tm = it.hasKey("time") ? it["time"] : (it.hasKey(:time) ? it[:time] : Time.now().value());
+                    var isRead = it.hasKey("isRead") ? (it["isRead"] as Boolean) : (it.hasKey(:isRead) ? (it[:isRead] as Boolean) : isOut);
+                    var st = it.hasKey("status") ? it["status"] : (it.hasKey(:status) ? it[:status] : (isOut ? STATUS_CONFIRMED_MESH : 0));
+                    if (tid != null && txt != null) {
+                        loaded.add({
+                            :targetId => tid as String,
+                            :sender => (snd != null) ? (snd as String) : "Mesh",
+                            :text => txt as String,
+                            :isOutgoing => isOut,
+                            :time => tm as Number,
+                            :isRead => isRead,
+                            :status => (st != null) ? (st as Number) : 0
+                        });
                     }
-                    loaded.add({
-                        :targetId => it["targetId"],
-                        :sender => it["sender"],
-                        :text => it["text"],
-                        :isOutgoing => isOut,
-                        :time => it["time"],
-                        :isRead => isRead,
-                        :status => st
-                    });
                 }
                 _messages = loaded;
             }

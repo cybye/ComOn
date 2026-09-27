@@ -6,7 +6,7 @@ import Toybox.Lang;
 
 class SosActiveView extends WatchUi.View {
     public var repeatCountdown as Number = 60;
-    private var _timer as Timer.Timer?;
+    private var _timer as SoftTimer?;
 
     function initialize() {
         View.initialize();
@@ -18,7 +18,7 @@ class SosActiveView extends WatchUi.View {
     }
 
     function onShow() as Void {
-        _timer = new Timer.Timer();
+        _timer = new SoftTimer();
         _timer.start(method(:onTick), 1000, true);
         WatchUi.requestUpdate();
     }

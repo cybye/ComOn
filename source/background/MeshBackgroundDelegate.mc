@@ -9,11 +9,14 @@ import Toybox.Lang;
 class MeshBackgroundDelegate extends System.ServiceDelegate {
     private static const STORAGE_NODE_UNAVAILABLE_NOTIFIED as String = "cfg_bg_node_unavailable_notified";
     private static const STORAGE_FOREGROUND_ACTIVE as String = "cfg_foreground_active";
+    private static const STORAGE_FOREGROUND_ACTIVE_AT as String = "cfg_foreground_active_at";
     private static const STORAGE_SCHEDULER_PROBE as String = "cfg_bg_scheduler_probe";
     private static const STORAGE_NOTIF_INCOMING_BATCH as String = "cfg_notif_incoming_batch";
     private static const STORAGE_NOTIF_OPEN_CHAT as String = "cfg_notif_open_chat";
     private static const STORAGE_NOTIF_OPEN_CHATS as String = "cfg_notif_open_chats";
     private static const STORAGE_LOW_BATTERY_NOTIFIED as String = "cfg_bg_low_battery_notified";
+    // Foreground refreshes the timestamp every 60s; older means the app died without onStop
+    private static const FOREGROUND_FLAG_MAX_AGE_SECS as Number = 180;
     private var _poller as MeshBackgroundNodePoller? = null;
     private var _runId as Number = 0;
 
@@ -41,11 +44,29 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
         }
 
         if (Storage.getValue(STORAGE_FOREGROUND_ACTIVE) == true) {
-            var outcome = (Storage.getValue(STORAGE_SCHEDULER_PROBE) == true) ? "scheduler_probe" : "foreground_active";
-            System.println("Background poll: skipped while ComOn foreground session is active");
-            MeshBackgroundDiagnostics.finishRun(_runId, outcome, false, 0);
-            completeBackgroundEvent(0, null, null, [] as Array<String>);
-            return;
+            // Safety: if flag is stale (app crashed without calling onStop), ignore it
+            var flaggedAt = Storage.getValue(STORAGE_FOREGROUND_ACTIVE_AT);
+            var isStale = false;
+            if (flaggedAt instanceof Number) {
+                var age = Time.now().value() - (flaggedAt as Number);
+                if (age > FOREGROUND_FLAG_MAX_AGE_SECS) {
+                    isStale = true;
+                    System.println("Background poll: foreground flag is stale (" + age + "s old), clearing");
+                    Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
+                    Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE_AT);
+                }
+            } else {
+                // No timestamp recorded — treat as stale to be safe
+                isStale = true;
+                Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
+            }
+            if (!isStale) {
+                var outcome = (Storage.getValue(STORAGE_SCHEDULER_PROBE) == true) ? "scheduler_probe" : "foreground_active";
+                System.println("Background poll: skipped while ComOn foreground session is active");
+                MeshBackgroundDiagnostics.finishRun(_runId, outcome, false, 0);
+                completeBackgroundEvent(0, null, null, [] as Array<String>);
+                return;
+            }
         }
 
         MeshBackgroundDiagnostics.setState(_runId, "polling");
@@ -72,7 +93,7 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
             if (pct <= 15) {
                 if (Storage.getValue(STORAGE_LOW_BATTERY_NOTIFIED) != true) {
                     try {
-                        Notifications.showNotification("ComOn", "Node Akku schwach", { :body => "MeshCore Node Akku bei " + pct + "%", :dismissPrevious => false });
+                        Notifications.showNotification("ComOn", "Node Akku low", { :body => "MeshCore Node Akku low at " + pct + "%", :dismissPrevious => false });
                         Storage.setValue(STORAGE_LOW_BATTERY_NOTIFIED, true);
                         System.println("MeshBackgroundDelegate: posted low-battery notification (" + pct + "%)");
                     } catch (e) {
@@ -94,30 +115,47 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
                     body = Lang.format(batchTemplate as String, [ messageCount.format("%d") ]) + "\n" + body;
                 }
                 var actions = [] as Array<Notifications.Action>;
+                var primaryData = "ACTION_LIST";
                 if (targetIds.size() == 1) {
                     var openChatLabel = Storage.getValue(STORAGE_NOTIF_OPEN_CHAT);
                     if (openChatLabel == null) {
                         openChatLabel = "Open Chat";
                     }
-                    actions.add({ :label => openChatLabel as String, :data => "ACTION_CHAT|" + targetIds[0] });
+                    primaryData = "ACTION_CHAT|" + targetIds[0];
+                    actions.add({ :label => openChatLabel as String, :data => primaryData });
+                    actions.add({ :label => storedLabel("cfg_notif_reply", "Reply"), :data => "ACTION_REPLY|" + targetIds[0] });
+                    actions.add({ :label => storedLabel("cfg_notif_position", "Position"), :data => "ACTION_SEND_POS|" + targetIds[0] });
+                    actions.add({ :label => storedLabel("cfg_notif_ok", "OK"), :data => "ACTION_SEND_OK|" + targetIds[0] });
                 } else if (targetIds.size() > 1) {
                     var openChatsLabel = Storage.getValue(STORAGE_NOTIF_OPEN_CHATS);
                     if (openChatsLabel == null) {
                         openChatsLabel = "Open Chats";
                     }
                     actions.add({ :label => openChatsLabel as String, :data => "ACTION_LIST" });
+                } else {
+                    actions.add({ :label => "Open Chats", :data => "ACTION_LIST" });
                 }
                 var notificationTitle = (lastNotificationTitle != null) ? lastNotificationTitle : ("Mesh: " + lastSender);
                 var subTitle = Storage.getValue("cfg_notif_incoming_msg");
                 if (subTitle == null) {
                     subTitle = "Incoming message";
                 }
-                Notifications.showNotification(notificationTitle, subTitle as String, { :body => body, :dismissPrevious => true, :actions => actions });
+                Notifications.showNotification(notificationTitle, subTitle as String, {
+                    :body => body,
+                    :data => primaryData,
+                    :dismissPrevious => true,
+                    :actions => actions
+                });
             } catch (e) {
                 System.println("MeshBackgroundDelegate: notification failed: " + e.getErrorMessage());
             }
         }
         completeBackgroundEvent(messageCount, lastSender, lastMessage, targetIds);
+    }
+
+    private function storedLabel(key as String, fallback as String) as String {
+        var value = Storage.getValue(key);
+        return (value instanceof String) ? (value as String) : fallback;
     }
 
     private function completeBackgroundEvent(messageCount as Number, lastSender as String?, lastMessage as String?, targetIds as Array<String>) as Void {

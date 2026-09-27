@@ -296,11 +296,16 @@ class MeshBackgroundNodePoller {
             return;
         }
         if (_fragmentBuffer != null) {
-            (_fragmentBuffer as ByteArray).addAll(value);
-            if (value.size() < 20) {
+            var firstByte = value[0] as Number;
+            if (isControlFrame(firstByte)) {
                 finishFragment();
+            } else {
+                (_fragmentBuffer as ByteArray).addAll(value);
+                if (value.size() < 20) {
+                    finishFragment();
+                }
+                return;
             }
-            return;
         }
         if (value.size() == 20 && isMessageFrame(value[0] as Number)) {
             _fragmentBuffer = []b;
@@ -308,6 +313,14 @@ class MeshBackgroundNodePoller {
             return;
         }
         processFrame(value);
+    }
+
+    private function isControlFrame(code as Number) as Boolean {
+        return code == RESP_CODE_NO_MORE_MESSAGES ||
+               code == RESP_CODE_ERR ||
+               code == RESP_CODE_BATT_AND_STORAGE ||
+               isMessageFrame(code) ||
+               code >= 0x80;
     }
 
     private function isMessageFrame(code as Number) as Boolean {
@@ -501,6 +514,11 @@ class MeshBackgroundNodePoller {
             return;
         }
         _finished = true;
+        if (_fragmentBuffer != null) {
+            var pending = _fragmentBuffer;
+            _fragmentBuffer = null;
+            processFrame(pending as ByteArray);
+        }
         stopScan();
         if (_device != null) {
             try {

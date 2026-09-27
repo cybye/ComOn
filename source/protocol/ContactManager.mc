@@ -31,8 +31,14 @@ class ContactManager {
     private static var _activityTargetName as String = "";
 
     private static var _inFullSync as Boolean = false;
+    private static var _syncContactsComplete as Boolean = false;
+    private static var _isDataFieldMode as Boolean = false;
     private static var _syncingChannels as Array<Dictionary> = [] as Array<Dictionary>;
     private static var _syncingContacts as Array<Dictionary> = [] as Array<Dictionary>;
+
+    public static function setIsDataFieldMode(val as Boolean) as Void {
+        _isDataFieldMode = val;
+    }
 
     private static var _channels as Array<Dictionary> = [
         { :name => "#public", :idx => 0 }
@@ -108,27 +114,28 @@ class ContactManager {
                 chList.add({ "name" => c[:name], "idx" => c[:idx] });
             }
 
-            var ctList = [] as Array<Dictionary>;
-            for (var j = 0; j < _contacts.size(); j++) {
-                var ct = _contacts[j];
-                ctList.add({
-                    "name" => ct[:name],
-                    "id" => ct[:id],
-                    "isChannel" => (ct[:isChannel] != null) ? ct[:isChannel] : false,
-                    "idx" => (ct[:idx] != null) ? ct[:idx] : 0,
-                    "advType" => (ct.hasKey(:advType) && ct[:advType] != null) ? ct[:advType] : 1
-                });
-            }
-
             Storage.setValue(STORAGE_CHANNELS, chList);
-            Storage.setValue(STORAGE_CONTACTS, ctList);
+            if (!_isDataFieldMode) {
+                var ctList = [] as Array<Dictionary>;
+                for (var j = 0; j < _contacts.size(); j++) {
+                    var ct = _contacts[j];
+                    ctList.add({
+                        "name" => ct[:name],
+                        "id" => ct[:id],
+                        "isChannel" => (ct[:isChannel] != null) ? ct[:isChannel] : false,
+                        "idx" => (ct[:idx] != null) ? ct[:idx] : 0,
+                        "advType" => (ct.hasKey(:advType) && ct[:advType] != null) ? ct[:advType] : 1
+                    });
+                }
+                Storage.setValue(STORAGE_CONTACTS, ctList);
+                rebuildBackgroundIdentityCaches();
+            }
             Storage.setValue(STORAGE_SYNC_TIME, _lastContactSyncTime);
             if (_pairedNodeId != null) {
                 Storage.setValue(STORAGE_PAIRED_NODE, _pairedNodeId);
             }
-            rebuildBackgroundIdentityCaches();
         } catch (e) {
-            System.println("ContactManager storage write notice");
+            System.println("ContactManager storage write notice: " + e.getErrorMessage());
         }
     }
 
@@ -246,9 +253,14 @@ class ContactManager {
 
     public static function startFullSync() as Void {
         _inFullSync = true;
+        _syncContactsComplete = false;
         _syncingChannels = [] as Array<Dictionary>;
         _syncingContacts = [] as Array<Dictionary>;
         System.println("ContactManager: Full Sync started (staging buffers initialized)");
+    }
+
+    public static function markSyncContactsComplete() as Void {
+        _syncContactsComplete = true;
     }
 
     public static function addSyncChannel(idx as Number, name as String) as Void {
@@ -285,9 +297,16 @@ class ContactManager {
             } else {
                 _channels = [ { :name => "#public", :idx => 0 } ];
             }
-            _contacts = _syncingContacts;
+            // Keep cached contacts unless the node delivered a complete (or larger) contact list
+            if (_syncContactsComplete || _syncingContacts.size() > _contacts.size()) {
+                _contacts = _syncingContacts;
+            }
+            if (_syncContactsComplete || _isDataFieldMode) {
+                _lastContactSyncTime = Time.now().value();
+            }
             _inFullSync = false;
-            _lastContactSyncTime = Time.now().value();
+            _syncContactsComplete = false;
+            _syncingContacts = [] as Array<Dictionary>;
             validateSelection();
             saveToStorage();
             System.println("ContactManager: Full Sync committed (" + _channels.size() + " channels, " + _contacts.size() + " contacts)");
@@ -340,6 +359,7 @@ class ContactManager {
 
     public static function cancelFullSync() as Void {
         _inFullSync = false;
+        _syncContactsComplete = false;
         _syncingChannels = [] as Array<Dictionary>;
         _syncingContacts = [] as Array<Dictionary>;
     }

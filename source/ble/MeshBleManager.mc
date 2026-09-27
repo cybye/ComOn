@@ -38,14 +38,14 @@ class MeshBleManager {
     private var _isFastSync as Boolean = false;
     private var _spoolQueue as Array<Dictionary> = [] as Array<Dictionary>;
     private var _pauseScanUntil as Number = 0;
-    private var _syncTimeoutTimer as Timer.Timer? = null;
-    private var _inboxPollTimeoutTimer as Timer.Timer? = null;
-    private var _telemetryPollTimer as Timer.Timer? = null;
-    private var _scanTimeoutTimer as Timer.Timer? = null;
-    private var _reconnectTimer as Timer.Timer? = null;
-    private var _pairResetTimer as Timer.Timer? = null;
-    private var _pairTimeoutTimer as Timer.Timer? = null;
-    private var _rxFragmentTimer as Timer.Timer? = null;
+    private var _syncTimeoutTimer as SoftTimer? = null;
+    private var _inboxPollTimeoutTimer as SoftTimer? = null;
+    private var _telemetryPollTimer as SoftTimer? = null;
+    private var _scanTimeoutTimer as SoftTimer? = null;
+    private var _reconnectTimer as SoftTimer? = null;
+    private var _pairResetTimer as SoftTimer? = null;
+    private var _pairTimeoutTimer as SoftTimer? = null;
+    private var _rxFragmentTimer as SoftTimer? = null;
     private var _rxFragmentBuffer as ByteArray? = null;
     private var _isPairing as Boolean = false;
     private var _isResettingPairing as Boolean = false;
@@ -57,10 +57,11 @@ class MeshBleManager {
     private var _isInboxPolling as Boolean = false;
     private var _inboxPollCount as Number = 0;
     private static const MAX_INBOX_POLL_MESSAGES as Number = 5;
+    private static const CONTACT_FRAME_SIZE as Number = 148;
     private var _txQueue as Array<ByteArray> = [] as Array<ByteArray>;
     private var _isWriting as Boolean = false;
-    private var _txTimeoutTimer as Timer.Timer? = null;
-    private var _cccdRetryTimer as Timer.Timer? = null;
+    private var _txTimeoutTimer as SoftTimer? = null;
+    private var _cccdRetryTimer as SoftTimer? = null;
     private var _cccdRetryCount as Number = 0;
 
     private var _isDataField as Boolean = false;
@@ -73,21 +74,12 @@ class MeshBleManager {
         return _isDataField;
     }
 
-    //! Safe Timer constructor: DataField apps do not have permission for Toybox.Timer
-    private function safeTimer() as Timer.Timer? {
+    //! DataField apps do not have permission for Toybox.Timer
+    private function safeTimer() as SoftTimer? {
         if (_isDataField) {
             return null;
         }
-        var app = Application.getApp();
-        if (app != null && (app has :getSettingsView)) {
-            _isDataField = true;
-            return null;
-        }
-        try {
-            return new Timer.Timer();
-        } catch (e) {
-            return null;
-        }
+        return new SoftTimer();
     }
 
     public function forceFullSync() as Void {
@@ -109,10 +101,6 @@ class MeshBleManager {
     }
 
     function initialize() {
-        var app = Application.getApp();
-        if (app != null && (app has :getSettingsView)) {
-            _isDataField = true;
-        }
         virtualNode    = VirtualMeshNode.getInstance();
         nusServiceUuid = BluetoothLowEnergy.stringToUuid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
         nusRxUuid      = BluetoothLowEnergy.stringToUuid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -574,7 +562,9 @@ class MeshBleManager {
         _syncedMessagesCount = 0;
         _channelSyncIdx = 0;
 
-        var requiresFullSync = _isFullSync || ContactManager.getLastContactSyncTime() == 0;
+        // An empty contact cache with a stored sync time is left over from an earlier failed sync
+        var requiresFullSync = _isFullSync || ContactManager.getLastContactSyncTime() == 0 ||
+            (!_isDataField && ContactManager.getContacts().size() == 0);
         _isFastSync = !requiresFullSync;
         if (requiresFullSync) {
             _isFullSync = true;
@@ -719,8 +709,11 @@ class MeshBleManager {
         }
 
         if (_rxFragmentBuffer != null) {
-            (_rxFragmentBuffer as ByteArray).addAll(value);
-            if (value.size() < 20) {
+            var buffer = _rxFragmentBuffer as ByteArray;
+            buffer.addAll(value);
+            // Contact records have a fixed length, so don't rely on the short-chunk heuristic
+            var isCompleteContact = buffer[0] == MeshProtocol.RESP_CODE_CONTACT && buffer.size() >= CONTACT_FRAME_SIZE;
+            if (value.size() < 20 || isCompleteContact) {
                 finishFragmentedFrame();
             } else {
                 scheduleFragmentTimeout();
@@ -756,7 +749,7 @@ class MeshBleManager {
             _rxFragmentTimer.stop();
         }
         if (_rxFragmentTimer != null) {
-            _rxFragmentTimer.start(method(:onFragmentTimeout), 120, false);
+            _rxFragmentTimer.start(method(:onFragmentTimeout), 400, false);
         }
     }
 
@@ -904,8 +897,12 @@ class MeshBleManager {
                 return;
             } else if (firstByte == MeshProtocol.RESP_CODE_CONTACT) {
                 parseBinaryContact(value);
+                if (_syncTimeoutTimer != null) {
+                    _syncTimeoutTimer.start(method(:onSyncTimeout), 8000, false);
+                }
                 return;
             } else if (firstByte == MeshProtocol.RESP_CODE_END_OF_CONTACTS || firstByte == MeshProtocol.RESP_CODE_ERR) {
+                ContactManager.markSyncContactsComplete();
                 ContactManager.setLastContactSyncTime(Time.now().value());
                 if (_isDataField) {
                     System.println("BLE DataField full sync complete (" + ContactManager.getContacts().size() + " contacts) -> skipping inbox");
@@ -1155,8 +1152,8 @@ class MeshBleManager {
             _telemetryPollTimer.stop();
         }
         if (_telemetryPollTimer != null) {
-            _telemetryPollTimer.start(method(:onPeriodicTelemetryPoll), 60000, true);
-            System.println("BLE: 60s periodic telemetry poll timer started");
+            _telemetryPollTimer.start(method(:onPeriodicTelemetryPoll), 30000, true);
+            System.println("BLE: 30s periodic telemetry & inbox poll timer started");
         }
     }
 
@@ -1170,8 +1167,11 @@ class MeshBleManager {
 
     public function onPeriodicTelemetryPoll() as Void {
         if (isConnected && !isSyncing && _syncStage == 0) {
-            System.println("BLE: Periodic 60s poll: querying battery & radio stats");
+            System.println("BLE: Periodic poll: querying battery & inbox messages");
             sendRaw(MeshProtocol.encodeGetBattery());
+            if (!_isDataField) {
+                pollInboxMessages();
+            }
         }
     }
 
@@ -1267,6 +1267,11 @@ class MeshBleManager {
     }
 
     private function advanceToContactsStage() as Void {
+        if (_isDataField) {
+            System.println("BLE DataField sync: channels done -> skipping contacts stage to save memory");
+            finishSessionSync();
+            return;
+        }
         _syncStage = 5;
         System.println("BLE session sync stage 5: query contacts");
         var since = (_isFullSync || ContactManager.getLastContactSyncTime() == 0) ? 0 : ContactManager.getLastContactSyncTime();

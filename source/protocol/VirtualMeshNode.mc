@@ -115,7 +115,7 @@ class VirtualMeshNode {
 
         // Schedule PushSendConfirmed (0x82) after 400ms (Double check ✓✓)
         if (_meshSendConfirmTimer == null) {
-            _meshSendConfirmTimer = new Timer.Timer();
+            _meshSendConfirmTimer = new SoftTimer();
         }
         _meshSendConfirmTimer.start(method(:onMeshSendConfirmedTrigger), 400, false);
 
@@ -149,7 +149,7 @@ class VirtualMeshNode {
 
         // Schedule PushSendConfirmed (0x82) after 400ms (Double check ✓✓)
         if (_meshSendConfirmTimer == null) {
-            _meshSendConfirmTimer = new Timer.Timer();
+            _meshSendConfirmTimer = new SoftTimer();
         }
         _meshSendConfirmTimer.start(method(:onMeshSendConfirmedTrigger), 400, false);
     }
@@ -328,8 +328,8 @@ class VirtualMeshNode {
         return _inbox.size();
     }
 
-    private var _meshSendConfirmTimer as Timer.Timer? = null;
-    private var _echoTimer as Timer.Timer? = null;
+    private var _meshSendConfirmTimer as SoftTimer? = null;
+    private var _echoTimer as SoftTimer? = null;
     private var _pendingEchoText as String = "";
     private var _pendingEchoChannel as Number = 0;
 
@@ -338,7 +338,7 @@ class VirtualMeshNode {
         _pendingEchoChannel = channelIdx;
 
         if (_echoTimer == null) {
-            _echoTimer = new Timer.Timer();
+            _echoTimer = new SoftTimer();
         }
         _echoTimer.start(method(:onEchoTimerTrigger), 1200, false);
     }

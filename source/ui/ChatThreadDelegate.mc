@@ -2,12 +2,38 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
 
-class ChatThreadDelegate extends WatchUi.InputDelegate {
+class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
     private var _view as ChatThreadView;
 
     function initialize(view as ChatThreadView) {
-        InputDelegate.initialize();
+        BehaviorDelegate.initialize();
         _view = view;
+    }
+
+    //! 2 O'CLOCK BUTTON (START / SELECT)
+    function onSelect() as Boolean {
+        System.println("ChatThread: onSelect -> opening CannedMessageMenu");
+        WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_LEFT);
+        return true;
+    }
+
+    //! 4 O'CLOCK BUTTON (BACK / ESC)
+    function onBack() as Boolean {
+        System.println("ChatThread: onBack -> popView");
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
+        return true;
+    }
+
+    //! 7 O'CLOCK BUTTON (DOWN)
+    function onNextPage() as Boolean {
+        _view.scrollDown();
+        return true;
+    }
+
+    //! 9 O'CLOCK BUTTON (UP)
+    function onPreviousPage() as Boolean {
+        _view.scrollUp();
+        return true;
     }
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {

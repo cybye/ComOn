@@ -24,6 +24,8 @@ class ChatsListView extends WatchUi.View {
     function onShow() as Void {
         updateItemList();
         WatchUi.requestUpdate();
+        // Registered here so queued notification selections are delivered once a view stack exists
+        MeshNotificationManager.getInstance().register();
     }
 
     public function updateItemList() as Void {

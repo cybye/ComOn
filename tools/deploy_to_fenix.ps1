@@ -1,18 +1,21 @@
 $shell = New-Object -ComObject Shell.Application
 $computer = $shell.Namespace(17) # ssfDRIVES / My Computer
-$fenix = $computer.Items() | Where-Object { $_.Name -like '*fenix*' -or $_.Name -like '*Garmin*' }
+$fenix = $computer.Items() | Where-Object { $_.Name -like '*fenix*' -or $_.Name -like '*Garmin*' } | Select-Object -First 1
 if ($fenix) {
     Write-Host "Found device: $($fenix.Name)"
-    $storage = $fenix.GetFolder.Items() | Where-Object { $_.Name -like '*Internal Storage*' -or $_.Name -like '*Primary*' }
+    $storage = $fenix.GetFolder.Items() | Where-Object { $_.Name -like '*Internal Storage*' -or $_.Name -like '*Primary*' } | Select-Object -First 1
     if ($storage) {
-        $garmin = $storage.GetFolder.Items() | Where-Object { $_.Name -eq 'GARMIN' }
-        if ($garmin) {
-            $apps = $garmin.GetFolder.Items() | Where-Object { $_.Name -eq 'Apps' }
+        $garmin = $storage.GetFolder.Items() | Where-Object { $_.Name -eq 'GARMIN' } | Select-Object -First 1
+        $garminFolder = if ($garmin) { $garmin.GetFolder } else { $null }
+        if ($garminFolder) {
+            $apps = $garminFolder.Items() | Where-Object { $_.Name -eq 'Apps' } | Select-Object -First 1
             if ($apps) {
                 Write-Host "Found GARMIN\Apps folder"
                 $appsFolder = $apps.GetFolder
                 
-                $dfSource = (Resolve-Path "bin\ComOnDatafield.prg").Path
+                $dfCandidate = "bin\ComOnDataField_fenix847mm.prg"
+                if (-not (Test-Path $dfCandidate)) { $dfCandidate = "bin\ComOnDatafield.prg" }
+                $dfSource = (Resolve-Path $dfCandidate).Path
                 Write-Host "Deploying $dfSource to Apps..."
                 $appsFolder.CopyHere($dfSource, 16)
                 Write-Host "Waiting for DataField MTP transfer..."
