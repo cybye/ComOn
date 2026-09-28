@@ -92,7 +92,7 @@ class MeshCoreApp extends Application.AppBase {
         }
 
         TelemetryProvider.getInstance().stopTracking();
-        (_bleManager as MeshBleManager).releaseNode(0);
+        (_bleManager as MeshBleManager).releaseNode(0, false);
 
         // Schedule background message check according to configured interval
         var intervalSecs = Storage.getValue(StorageKeys.BG_INTERVAL);

@@ -35,7 +35,7 @@ class NodeSimulatorDelegate extends WatchUi.Menu2InputDelegate {
         var bleManager = getBleManager();
         var node = bleManager.virtualNode;
         if (id.equals("SIM_CONN")) {
-            if (bleManager.isConnected) { bleManager.simulateDisconnect(); }
+            if (bleManager.isConnected) { bleManager.simulateDisconnect(true); }
             else { bleManager.simulateConnect("Virtual-Node"); }
         } else if (id.equals("SIM_BUFFER")) {
             node.fillInboxWithMissedMessages();

@@ -338,7 +338,7 @@ class MeshBleManager {
         startScan();
     }
 
-    public function releaseNode(pauseSeconds as Number) as Void {
+    public function releaseNode(pauseSeconds as Number, updateUi as Boolean) as Void {
         _pauseScanUntil = Time.now().value() + pauseSeconds;
         stopScan();
         stopPeriodicTelemetryTimer();
@@ -365,7 +365,7 @@ class MeshBleManager {
         _cccdRetryCount = 0;
 
         if (isSimulated) {
-            simulateDisconnect();
+            simulateDisconnect(updateUi);
         } else {
             if (_device != null) {
                 try {
@@ -386,7 +386,7 @@ class MeshBleManager {
             peerCount = 0;
         }
 
-        if (WatchUi has :requestUpdate) {
+        if (updateUi && WatchUi has :requestUpdate) {
             WatchUi.requestUpdate();
         }
     }
@@ -1535,7 +1535,7 @@ class MeshBleManager {
         startSessionSync();
     }
 
-    public function simulateDisconnect() as Void {
+    public function simulateDisconnect(updateUi as Boolean) as Void {
         stopPeriodicTelemetryTimer();
         isConnected = false;
         isSyncing = false;
@@ -1546,7 +1546,9 @@ class MeshBleManager {
         nodeBatteryPercent = null;
         nodeBatteryMv = null;
         peerCount = 0;
-        WatchUi.requestUpdate();
+        if (updateUi) {
+            WatchUi.requestUpdate();
+        }
     }
 
     public function cycleSimulatedSignal() as Void {

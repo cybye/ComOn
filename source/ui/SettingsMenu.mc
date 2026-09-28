@@ -127,7 +127,7 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
             bleManager.forceFullSync();
             WatchUi.showToast(I18n.get(Rez.Strings.ToastSyncStarted), null);
         } else if (id.equals("SET_RELEASE")) {
-            bleManager.releaseNode(180);
+            bleManager.releaseNode(180, true);
             WatchUi.showToast(I18n.get(Rez.Strings.ToastNodeReleased), null);
         } else if (id.equals("SET_BG_PROBE")) {
             var enabledProbe = Storage.getValue("cfg_bg_scheduler_probe") == true;

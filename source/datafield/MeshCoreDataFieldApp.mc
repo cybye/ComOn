@@ -33,7 +33,7 @@ class MeshCoreDataFieldApp extends Application.AppBase {
 
     function onStop(state as Dictionary?) as Void {
         _bleManager.stopScan();
-        _bleManager.releaseNode(0);
+        _bleManager.releaseNode(0, false);
     }
 
     function getInitialView() as [Views] or [Views, InputDelegates] {
