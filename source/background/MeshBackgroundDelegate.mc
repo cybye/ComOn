@@ -7,14 +7,6 @@ import Toybox.Lang;
 
 (:background)
 class MeshBackgroundDelegate extends System.ServiceDelegate {
-    private static const STORAGE_NODE_UNAVAILABLE_NOTIFIED as String = "cfg_bg_node_unavailable_notified";
-    private static const STORAGE_FOREGROUND_ACTIVE as String = "cfg_foreground_active";
-    private static const STORAGE_FOREGROUND_ACTIVE_AT as String = "cfg_foreground_active_at";
-    private static const STORAGE_SCHEDULER_PROBE as String = "cfg_bg_scheduler_probe";
-    private static const STORAGE_NOTIF_INCOMING_BATCH as String = "cfg_notif_incoming_batch";
-    private static const STORAGE_NOTIF_OPEN_CHAT as String = "cfg_notif_open_chat";
-    private static const STORAGE_NOTIF_OPEN_CHATS as String = "cfg_notif_open_chats";
-    private static const STORAGE_LOW_BATTERY_NOTIFIED as String = "cfg_bg_low_battery_notified";
     // Foreground refreshes the timestamp every 60s; older means the app died without onStop
     private static const FOREGROUND_FLAG_MAX_AGE_SECS as Number = 180;
     private var _poller as MeshBackgroundNodePoller? = null;
@@ -29,7 +21,7 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
         _runId = MeshBackgroundDiagnostics.startRun("temporal");
 
         // Read configured background check interval (default 300s = 5 min)
-        var intervalSecs = Storage.getValue("bgInterval");
+        var intervalSecs = Storage.getValue(StorageKeys.BG_INTERVAL);
         if (intervalSecs == null) {
             intervalSecs = 300;
         }
@@ -43,25 +35,25 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
             return;
         }
 
-        if (Storage.getValue(STORAGE_FOREGROUND_ACTIVE) == true) {
+        if (Storage.getValue(StorageKeys.FOREGROUND_ACTIVE) == true) {
             // Safety: if flag is stale (app crashed without calling onStop), ignore it
-            var flaggedAt = Storage.getValue(STORAGE_FOREGROUND_ACTIVE_AT);
+            var flaggedAt = Storage.getValue(StorageKeys.FOREGROUND_ACTIVE_AT);
             var isStale = false;
             if (flaggedAt instanceof Number) {
                 var age = Time.now().value() - (flaggedAt as Number);
                 if (age > FOREGROUND_FLAG_MAX_AGE_SECS) {
                     isStale = true;
                     System.println("Background poll: foreground flag is stale (" + age + "s old), clearing");
-                    Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
-                    Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE_AT);
+                    Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE);
+                    Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE_AT);
                 }
             } else {
                 // No timestamp recorded — treat as stale to be safe
                 isStale = true;
-                Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
+                Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE);
             }
             if (!isStale) {
-                var outcome = (Storage.getValue(STORAGE_SCHEDULER_PROBE) == true) ? "scheduler_probe" : "foreground_active";
+                var outcome = (Storage.getValue(StorageKeys.SCHEDULER_PROBE) == true) ? "scheduler_probe" : "foreground_active";
                 System.println("Background poll: skipped while ComOn foreground session is active");
                 MeshBackgroundDiagnostics.finishRun(_runId, outcome, false, 0);
                 completeBackgroundEvent(0, null, null, [] as Array<String>);
@@ -78,11 +70,11 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
         var outcome = connectedToNode ? ((messageCount > 0) ? "messages" : "empty") : "node_unavailable";
         MeshBackgroundDiagnostics.finishRun(_runId, outcome, connectedToNode, messageCount);
         if (connectedToNode) {
-            Storage.deleteValue(STORAGE_NODE_UNAVAILABLE_NOTIFIED);
-        } else if (Storage.getValue(STORAGE_NODE_UNAVAILABLE_NOTIFIED) != true) {
+            Storage.deleteValue(StorageKeys.BG_NODE_UNAVAILABLE_NOTIFIED);
+        } else if (Storage.getValue(StorageKeys.BG_NODE_UNAVAILABLE_NOTIFIED) != true) {
             try {
                 Notifications.showNotification("ComOn", "Node unavailable", { :body => "Background check could not connect to the node.", :dismissPrevious => true });
-                Storage.setValue(STORAGE_NODE_UNAVAILABLE_NOTIFIED, true);
+                Storage.setValue(StorageKeys.BG_NODE_UNAVAILABLE_NOTIFIED, true);
                 System.println("MeshBackgroundDelegate: posted node-unavailable notification");
             } catch (e) {
                 System.println("MeshBackgroundDelegate: node-unavailable notification failed: " + e.getErrorMessage());
@@ -91,56 +83,47 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
         if (polledBatteryPercent != null) {
             var pct = polledBatteryPercent as Number;
             if (pct <= 15) {
-                if (Storage.getValue(STORAGE_LOW_BATTERY_NOTIFIED) != true) {
+                if (Storage.getValue(StorageKeys.BG_LOW_BATTERY_NOTIFIED) != true) {
                     try {
                         Notifications.showNotification("ComOn", "Node Battery low", { :body => "MeshCore Node battery low at " + pct + "%", :dismissPrevious => false });
-                        Storage.setValue(STORAGE_LOW_BATTERY_NOTIFIED, true);
+                        Storage.setValue(StorageKeys.BG_LOW_BATTERY_NOTIFIED, true);
                         System.println("MeshBackgroundDelegate: posted low-battery notification (" + pct + "%)");
                     } catch (e) {
                         System.println("MeshBackgroundDelegate: low-battery notification failed: " + e.getErrorMessage());
                     }
                 }
             } else if (pct > 20) {
-                Storage.deleteValue(STORAGE_LOW_BATTERY_NOTIFIED);
+                Storage.deleteValue(StorageKeys.BG_LOW_BATTERY_NOTIFIED);
             }
         }
         if (messageCount > 0 && lastSender != null && lastMessage != null) {
             try {
                 var body = lastMessage as String;
                 if (messageCount > 1) {
-                    var batchTemplate = Storage.getValue(STORAGE_NOTIF_INCOMING_BATCH);
+                    var batchTemplate = Storage.getValue(StorageKeys.NOTIF_INCOMING_BATCH);
                     if (batchTemplate == null) {
                         batchTemplate = "$1$s new messages";
                     }
                     body = Lang.format(batchTemplate as String, [ messageCount.format("%d") ]) + "\n" + body;
                 }
                 var actions = [] as Array<Notifications.Action>;
-                var primaryData = "ACTION_LIST";
+                var primaryData = NotificationBuilder.ACTION_LIST;
                 if (targetIds.size() == 1) {
-                    var openChatLabel = Storage.getValue(STORAGE_NOTIF_OPEN_CHAT);
-                    if (openChatLabel == null) {
-                        openChatLabel = "Open Chat";
-                    }
-                    primaryData = "ACTION_CHAT|" + targetIds[0];
-                    actions.add({ :label => openChatLabel as String, :data => primaryData });
-                    actions.add({ :label => storedLabel("cfg_notif_reply", "Reply"), :data => "ACTION_REPLY|" + targetIds[0] });
-                    actions.add({ :label => storedLabel("cfg_notif_position", "Position"), :data => "ACTION_SEND_POS|" + targetIds[0] });
-                    actions.add({ :label => storedLabel("cfg_notif_ok", "OK"), :data => "ACTION_SEND_OK|" + targetIds[0] });
-                } else if (targetIds.size() > 1) {
-                    var openChatsLabel = Storage.getValue(STORAGE_NOTIF_OPEN_CHATS);
-                    if (openChatsLabel == null) {
-                        openChatsLabel = "Open Chats";
-                    }
-                    actions.add({ :label => openChatsLabel as String, :data => "ACTION_LIST" });
+                    primaryData = NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, targetIds[0]);
+                    actions = NotificationBuilder.buildTargetActions(
+                        targetIds[0],
+                        storedLabel(StorageKeys.NOTIF_OPEN_CHAT, "Open Chat"),
+                        storedLabel(StorageKeys.NOTIF_REPLY, "Reply"),
+                        storedLabel(StorageKeys.NOTIF_POSITION, "Position"),
+                        storedLabel(StorageKeys.NOTIF_OK, "OK")
+                    );
                 } else {
-                    actions.add({ :label => "Open Chats", :data => "ACTION_LIST" });
+                    var openChatsLabel = storedLabel(StorageKeys.NOTIF_OPEN_CHATS, "Open Chats");
+                    actions.add({ :label => openChatsLabel, :data => NotificationBuilder.ACTION_LIST });
                 }
                 var notificationTitle = (lastNotificationTitle != null) ? lastNotificationTitle : ("Mesh: " + lastSender);
-                var subTitle = Storage.getValue("cfg_notif_incoming_msg");
-                if (subTitle == null) {
-                    subTitle = "Incoming message";
-                }
-                Notifications.showNotification(notificationTitle, subTitle as String, {
+                var subTitle = storedLabel(StorageKeys.NOTIF_INCOMING_MSG, "Incoming message");
+                Notifications.showNotification(notificationTitle, subTitle, {
                     :body => body,
                     :data => primaryData,
                     :dismissPrevious => true,

@@ -1,5 +1,6 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
+import Toybox.System;
 
 class CannedMessageMenu {
     public static function create() as WatchUi.Menu2 {
@@ -39,7 +40,6 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
     public function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
         if (id.equals("MSG_CUSTOM")) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
             KeyboardHelper.openKeyboardForTarget("", _targetId);
             return;
         }
@@ -58,7 +58,8 @@ class CannedMessageDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     public function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        System.println("CannedMessageDelegate: Back -> native menu pop");
+        Menu2InputDelegate.onBack();
     }
 }
 
@@ -71,13 +72,15 @@ class CustomTextPickerDelegate extends WatchUi.TextPickerDelegate {
     }
 
     function onTextEntered(text as String, changed as Boolean) as Boolean {
+        var showConnectionError = false;
         if (text != null && text.length() > 0) {
             var bleMgr = getBleManager();
             var ok = (_targetId != null) ? bleMgr.sendTextToConversation(_targetId as String, text) : bleMgr.sendChannelText(ContactManager.selectedChannelIdx, text);
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
-            if (!ok) {
-                WatchUi.showToast(I18n.get(Rez.Strings.ToastNotConnected), null);
-            }
+            showConnectionError = !ok;
+        }
+        WatchUi.popView(WatchUi.SLIDE_RIGHT);
+        if (showConnectionError) {
+            WatchUi.showToast(I18n.get(Rez.Strings.ToastNotConnected), null);
         }
         return true;
     }

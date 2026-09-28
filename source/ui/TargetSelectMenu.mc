@@ -60,7 +60,4 @@ class TargetSelectDelegate extends WatchUi.Menu2InputDelegate {
         WatchUi.showToast(I18n.format(Rez.Strings.TargetSelectedToast, [ label ]), null);
     }
 
-    function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
 }

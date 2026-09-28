@@ -1,10 +1,12 @@
 import Toybox.WatchUi;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.System;
 
 class ChatThreadView extends WatchUi.View {
     public var targetId as String;
     public var targetName as String;
+    public var onReturnToChat as (Method() as Void)? = null;
 
     private var _scrollOffset as Number = 0;
     private var _maxScroll as Number = 0;
@@ -25,8 +27,16 @@ class ChatThreadView extends WatchUi.View {
     }
 
     function onShow() as Void {
+        System.println("ChatThreadView: onShow " + targetId);
+        if (onReturnToChat != null) {
+            onReturnToChat.invoke();
+        }
         ChatHistoryManager.markAsRead(targetId);
         WatchUi.requestUpdate();
+    }
+
+    function onHide() as Void {
+        System.println("ChatThreadView: onHide " + targetId);
     }
 
     public function scrollUp() as Void {

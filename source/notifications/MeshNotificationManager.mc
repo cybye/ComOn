@@ -58,35 +58,33 @@ class MeshNotificationManager {
             // ignore
         }
 
-        var primaryAction = "ACTION_CHAT|" + _lastTargetId;
+        var primaryAction = NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, _lastTargetId);
         var options = {
             :body => text,
             :data => primaryAction,
             :dismissPrevious => true,
-            :actions => [
-                { :label => I18n.get(Rez.Strings.NotifActionOpenChat), :data => primaryAction },
-                { :label => I18n.get(Rez.Strings.NotifActionReply), :data => "ACTION_REPLY|" + _lastTargetId },
-                { :label => I18n.get(Rez.Strings.NotifActionPosition), :data => "ACTION_SEND_POS|" + _lastTargetId },
-                { :label => I18n.get(Rez.Strings.NotifActionOk), :data => "ACTION_SEND_OK|" + _lastTargetId }
-            ] as Array<Notifications.Action>
+            :actions => NotificationBuilder.buildTargetActions(
+                _lastTargetId,
+                I18n.get(Rez.Strings.NotifActionOpenChat),
+                I18n.get(Rez.Strings.NotifActionReply),
+                I18n.get(Rez.Strings.NotifActionPosition),
+                I18n.get(Rez.Strings.NotifActionOk)
+            )
         };
 
         // Build descriptive notification title (e.g. "#public: Seb_Herb" or "@Alice")
-        var notifTitle = sender;
+        var channelName = null as String?;
         if (_lastTargetId.find("CH_") == 0) {
             var channelIndex = _lastTargetId.substring(3, _lastTargetId.length()).toNumber();
-            var chName = "#" + channelIndex;
             var channels = ContactManager.getChannels();
             for (var c = 0; c < channels.size(); c++) {
                 if (channels[c][:idx] == channelIndex) {
-                    chName = channels[c][:name] as String;
+                    channelName = channels[c][:name] as String;
                     break;
                 }
             }
-            notifTitle = chName + ": " + sender;
-        } else {
-            notifTitle = "@" + sender;
         }
+        var notifTitle = NotificationBuilder.formatNotificationTitle(_lastTargetId, sender, channelName);
 
         System.println("MeshNotificationManager: showNotification called for " + notifTitle + " - " + text);
         try {
@@ -139,7 +137,7 @@ class MeshNotificationManager {
                 actionId = message.data as String;
             }
             if (actionId == null) {
-                actionId = "ACTION_CHAT|" + _lastTargetId;
+                actionId = NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, _lastTargetId);
             }
             handleAction(actionId);
         }
@@ -154,32 +152,29 @@ class MeshNotificationManager {
         _lastHandledAction = actionId;
         _lastHandledAt = now;
         System.println("MeshNotificationManager: handling action " + actionId);
-        var targetId = _lastTargetId;
-        var pipeIndex = actionId.find("|");
-        var baseAction = actionId;
-        if (pipeIndex != null && pipeIndex > 0) {
-            baseAction = actionId.substring(0, pipeIndex);
-            targetId = actionId.substring(pipeIndex + 1, actionId.length());
-        }
 
-        if (baseAction.equals("ACTION_LIST")) {
+        var parsed = NotificationBuilder.parseActionData(actionId);
+        var baseAction = parsed[:base] as String;
+        var targetId = (parsed[:targetId] != null) ? (parsed[:targetId] as String) : _lastTargetId;
+
+        if (baseAction.equals(NotificationBuilder.ACTION_LIST)) {
             // Launch already lands on the chat list
             return;
-        } else if (baseAction.equals("ACTION_CHAT")) {
+        } else if (baseAction.equals(NotificationBuilder.ACTION_CHAT)) {
             selectTargetById(targetId);
             var targetName = ContactManager.getTargetDisplayName();
             var view = new ChatThreadView(targetId, targetName);
             WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
-        } else if (baseAction.equals("ACTION_REPLY")) {
+        } else if (baseAction.equals(NotificationBuilder.ACTION_REPLY)) {
             selectTargetById(targetId);
             var targetName = ContactManager.getTargetDisplayName();
             var view = new ChatThreadView(targetId, targetName);
             WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
             WatchUi.pushView(CannedMessageMenu.createForTarget(targetId, targetName), new CannedMessageDelegate(targetId), WatchUi.SLIDE_LEFT);
-        } else if (baseAction.equals("ACTION_SEND_POS")) {
+        } else if (baseAction.equals(NotificationBuilder.ACTION_SEND_POS)) {
             selectTargetById(targetId);
             getBleManager().sendCurrentPositionToConversation(targetId);
-        } else if (baseAction.equals("ACTION_SEND_OK")) {
+        } else if (baseAction.equals(NotificationBuilder.ACTION_SEND_OK)) {
             selectTargetById(targetId);
             getBleManager().sendTextToConversation(targetId, I18n.get(Rez.Strings.CannedOk));
         }

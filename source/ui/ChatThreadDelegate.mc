@@ -2,51 +2,54 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
 
-class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
+class ChatThreadDelegate extends WatchUi.InputDelegate {
     private var _view as ChatThreadView;
+    private var _replyMenuPending as Boolean = false;
+    private var _replyMenuRequestedAt as Number = 0;
+    private var _backPending as Boolean = false;
+    private var _backRequestedAt as Number = 0;
 
     function initialize(view as ChatThreadView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         _view = view;
+        _view.onReturnToChat = method(:onReturnToChat);
     }
 
-    //! 2 O'CLOCK BUTTON (START / SELECT)
-    function onSelect() as Boolean {
-        System.println("ChatThread: onSelect -> opening CannedMessageMenu");
-        WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_LEFT);
-        return true;
+    public function onReturnToChat() as Void {
+        _replyMenuPending = false;
+        _backPending = false;
     }
 
-    //! 4 O'CLOCK BUTTON (BACK / ESC)
-    function onBack() as Boolean {
-        System.println("ChatThread: onBack -> popView");
+    private function openReplyMenu(source as String) as Void {
+        var now = System.getTimer();
+        if (_replyMenuPending && (now - _replyMenuRequestedAt) < 1000) {
+            return;
+        }
+        _replyMenuPending = true;
+        _replyMenuRequestedAt = now;
+        System.println("ChatThread: opening CannedMessageMenu from " + source);
+        WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_IMMEDIATE);
+    }
+
+    private function popChatView() as Void {
+        var now = System.getTimer();
+        if (_backPending && (now - _backRequestedAt) < 1500) {
+            return;
+        }
+        _backPending = true;
+        _backRequestedAt = now;
+        System.println("ChatThread: Back -> popView");
         WatchUi.popView(WatchUi.SLIDE_DOWN);
-        return true;
-    }
-
-    //! 7 O'CLOCK BUTTON (DOWN)
-    function onNextPage() as Boolean {
-        _view.scrollDown();
-        return true;
-    }
-
-    //! 9 O'CLOCK BUTTON (UP)
-    function onPreviousPage() as Boolean {
-        _view.scrollUp();
-        return true;
     }
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
         var key = keyEvent.getKey();
         System.println("ChatThreadDelegate: onKey key=" + key);
         if (key == WatchUi.KEY_ESC) {
-            System.println("ChatThreadDelegate: ESC pressed -> popView");
-            WatchUi.popView(WatchUi.SLIDE_DOWN);
+            popChatView();
             return true;
         } else if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
-            // Hardware START / ENTER button opens canned reply menu as requested
-            System.println("ChatThread: Hardware START button pressed -> opening CannedMessageMenu");
-            WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_LEFT);
+            openReplyMenu("key");
             return true;
         } else if (key == WatchUi.KEY_DOWN) {
             _view.scrollDown();
@@ -74,8 +77,7 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
 
         // Bottom [Message / Nachricht] pill button bounds -> opens standard replies menu
         if (_view.isPillTapped(tx, ty)) {
-            System.println("ChatThread: Message pill button clicked -> opening CannedMessageMenu");
-            WatchUi.pushView(CannedMessageMenu.createForTarget(_view.targetId, _view.targetName), new CannedMessageDelegate(_view.targetId), WatchUi.SLIDE_LEFT);
+            openReplyMenu("tap");
             return true;
         }
 
@@ -101,7 +103,7 @@ class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
             _view.scrollUp();
             return true;
         } else if (dir == WatchUi.SWIPE_RIGHT) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            popChatView();
             return true;
         }
         return false;

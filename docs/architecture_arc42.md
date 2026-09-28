@@ -587,6 +587,13 @@ flowchart TD
       - **Zwei-Phasen-SOS:** Aufteilung in `SosCountdownView` (mit deklarativem `SosCountdownLayout.xml`) und `SosActiveView` (mit `SosActiveLayout.xml`), gekoppelt über `WatchUi.switchToView` für saubere Stack-Hygiene.
       - **Datenfeld-Multilayout:** Automatische Umschaltung zwischen 2-Zeilen-Kompaktansicht für Split-Screens (`height < 180`) und 5-Stufen-Vollansicht für Einzelfeld-Trainingsseiten.
       - **Code-Bereinigung:** Vollständiges Entfernen der ungenutzten Custom-QWERTY-Tastaturkomponenten und des veralteten `DashboardView`. Text-Eingaben nutzen direkt Garmins natives `TextPicker`-Rad.
+* **ADR 38: MeshCoreEngine Entkopplung & Reaktives Touch-Delegation Modell:**
+   1. *Kontext & Problemstellung*:
+      Vor der Einführung von `MeshCoreEngine` war die technische BLE-Verwaltung eng mit der Chat- und Notifikationslogik im `BleManager` verwoben. Dies führte zu Redundanzen zwischen Foreground- und Background-Workflows und Render-Latenzen bei Touch-Eingaben. Insbesondere in `ChatsListView` führte die verzögerte Listenaktualisierung (`_isDirty` erst in `onUpdate()`) dazu, dass beim direkten Display-Antippen einer Chat-Kachel `onTap()` den Auswahlschritt synchron aufrief, bevor das Modell synchronisiert war, wodurch Klicks ins Leere liefen (`no item selected`).
+   2. *Lösung & Implementierung*:
+      - **MeshCoreEngine:** Vollständige Entkopplung der MeshCore-Fachlogik (`MeshCoreEngine.mc`, `MeshFrameParser.mc`, `StorageKeys.mc`, `NotificationBuilder.mc`) von den reinen BLE-Transfers.
+      - **Synchroner Datenzugriff:** `ChatsListView.getItemAt(idx)` und `getSelectedItem()` prüfen den Dirty-Status und synchronisieren den Kachelspeicher (`updateItemList()`) bedarfsgesteuert sofort, noch vor der Auswertung des Index.
+      - **Deterministische Touch-Navigation:** `ChatsListDelegate.onTap()` ermittelt den Index via `getCardIndexAt(tx, ty)`, aktualisiert die Ansicht und öffnet die Konversation direkt via `openItem(item)` ohne fehleranfällige Abhängigkeit von asynchronen Render-Zyklen.
 
 ---
 

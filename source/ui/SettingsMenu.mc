@@ -149,7 +149,4 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
         }
     }
 
-    public function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
 }

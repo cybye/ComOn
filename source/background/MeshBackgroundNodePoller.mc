@@ -11,17 +11,7 @@ import Toybox.Time;
 class MeshBackgroundNodePoller {
     private static const POLL_TIMEOUT_MS as Number = 12000;
     private static const MAX_BACKGROUND_MESSAGES as Number = 5;
-    private static const CMD_SYNC_NEXT_MESSAGE as Number = 10;
-    private static const CMD_GET_BATTERY_AND_STORAGE as Number = 20;
     private static const BATTERY_POLL_INTERVAL_SECS as Number = 3600;
-    private static const RESP_CODE_ERR as Number = 1;
-    private static const RESP_CODE_CONTACT_MSG as Number = 7;
-    private static const RESP_CODE_CHANNEL_MSG as Number = 8;
-    private static const RESP_CODE_NO_MORE_MESSAGES as Number = 10;
-    private static const RESP_CODE_BATT_AND_STORAGE as Number = 12;
-    private static const RESP_CODE_CONTACT_MSG_V3 as Number = 16;
-    private static const RESP_CODE_CHANNEL_MSG_V3 as Number = 17;
-    private static const PUSH_CODE_MSG_WAITING as Number = 0x83;
 
     private var _owner as MeshBackgroundDelegate;
     private var _delegate as MeshBackgroundBleDelegate;
@@ -213,7 +203,7 @@ class MeshBackgroundNodePoller {
 
     private function startDataSync() as Void {
         var now = Time.now().value();
-        var lastBatt = Storage.getValue("last_bg_battery_poll_time");
+        var lastBatt = Storage.getValue(StorageKeys.LAST_BG_BATTERY_POLL_TIME);
         var due = (lastBatt == null) || (!(lastBatt instanceof Number)) || ((now - (lastBatt as Number)) >= BATTERY_POLL_INTERVAL_SECS);
         if (due) {
             requestBattery();
@@ -234,7 +224,7 @@ class MeshBackgroundNodePoller {
         }
         _awaitingBattery = true;
         try {
-            _rxCharacteristic.requestWrite([CMD_GET_BATTERY_AND_STORAGE]b, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
+            _rxCharacteristic.requestWrite([MeshFrameParser.CMD_GET_BATTERY_AND_STORAGE]b, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
             System.println("Background poll: requested node battery");
         } catch (e) {
             System.println("Background poll: battery request failed: " + e.getErrorMessage());
@@ -279,7 +269,7 @@ class MeshBackgroundNodePoller {
             return;
         }
         try {
-            _rxCharacteristic.requestWrite([CMD_SYNC_NEXT_MESSAGE]b, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
+            _rxCharacteristic.requestWrite([MeshFrameParser.CMD_SYNC_NEXT_MESSAGE]b, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
         } catch (e) {
             System.println("Background poll: inbox request failed: " + e.getErrorMessage());
             finish();
@@ -297,7 +287,7 @@ class MeshBackgroundNodePoller {
         }
         if (_fragmentBuffer != null) {
             var firstByte = value[0] as Number;
-            if (isControlFrame(firstByte)) {
+            if (MeshFrameParser.isControlFrame(firstByte)) {
                 finishFragment();
             } else {
                 (_fragmentBuffer as ByteArray).addAll(value);
@@ -307,27 +297,12 @@ class MeshBackgroundNodePoller {
                 return;
             }
         }
-        if (value.size() == 20 && isMessageFrame(value[0] as Number)) {
+        if (value.size() == 20 && MeshFrameParser.isMessageFrame(value[0] as Number)) {
             _fragmentBuffer = []b;
             (_fragmentBuffer as ByteArray).addAll(value);
             return;
         }
         processFrame(value);
-    }
-
-    private function isControlFrame(code as Number) as Boolean {
-        return code == RESP_CODE_NO_MORE_MESSAGES ||
-               code == RESP_CODE_ERR ||
-               code == RESP_CODE_BATT_AND_STORAGE ||
-               isMessageFrame(code) ||
-               code >= 0x80;
-    }
-
-    private function isMessageFrame(code as Number) as Boolean {
-         return code == RESP_CODE_CONTACT_MSG ||
-             code == RESP_CODE_CHANNEL_MSG ||
-             code == RESP_CODE_CONTACT_MSG_V3 ||
-             code == RESP_CODE_CHANNEL_MSG_V3;
     }
 
     private function finishFragment() as Void {
@@ -342,35 +317,34 @@ class MeshBackgroundNodePoller {
         var code = value[0] as Number;
         if (_awaitingBattery) {
             _awaitingBattery = false;
-            if (code == RESP_CODE_BATT_AND_STORAGE) {
+            if (code == MeshFrameParser.RESP_CODE_BATT_AND_STORAGE) {
                 storeBattery(value);
-            } else if (code == RESP_CODE_ERR) {
+            } else if (code == MeshFrameParser.RESP_CODE_ERR) {
                 System.println("Background poll: battery query returned err");
             }
             requestNextMessage();
             return;
         }
 
-        if (code == RESP_CODE_NO_MORE_MESSAGES || code == RESP_CODE_ERR) {
+        if (code == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES || code == MeshFrameParser.RESP_CODE_ERR) {
             finish();
             return;
         }
-        if (code == RESP_CODE_CONTACT_MSG || code == RESP_CODE_CONTACT_MSG_V3) {
+        if (code == MeshFrameParser.RESP_CODE_CONTACT_MSG || code == MeshFrameParser.RESP_CODE_CONTACT_MSG_V3) {
             storeDirectMessage(value);
             requestFollowingMessage();
             return;
         }
-        if (code == RESP_CODE_CHANNEL_MSG || code == RESP_CODE_CHANNEL_MSG_V3) {
+        if (code == MeshFrameParser.RESP_CODE_CHANNEL_MSG || code == MeshFrameParser.RESP_CODE_CHANNEL_MSG_V3) {
             storeChannelMessage(value);
             requestFollowingMessage();
             return;
         }
-        if (code == PUSH_CODE_MSG_WAITING) {
+        if (code == MeshFrameParser.PUSH_CODE_MSG_WAITING) {
             requestNextMessage();
             return;
         }
         if (code >= 0x80) {
-            // Standard asynchronous push frames (0x80 Advert, 0x82 SendConfirmed, 0x88 LogRxData): ignore during inbox poll
             return;
         }
         System.println("Background poll: unexpected frame " + code);
@@ -387,48 +361,32 @@ class MeshBackgroundNodePoller {
     }
 
     private function storeChannelMessage(value as ByteArray) as Void {
-        var offset = (value[0] == RESP_CODE_CHANNEL_MSG_V3) ? 4 : 1;
-        var textOffset = offset + 7;
-        if (value.size() <= textOffset) {
+        var parsed = MeshFrameParser.parseChannelMessage(value);
+        if (parsed == null) {
             return;
         }
-        var text = decodeText(value, textOffset);
-        if (text == null || text.length() == 0) {
-            return;
-        }
-        var channelIndex = value[offset] as Number;
+        var channelIndex = parsed[:channelIdx] as Number;
         var channelName = resolveChannelName(channelIndex);
-        var sender = "Mesh";
-        var message = text;
-        var separator = text.find(": ");
-        if (separator != null && separator > 0) {
-            sender = text.substring(0, separator);
-            message = text.substring(separator + 2, text.length());
-        }
+        var sender = parsed[:sender] as String;
+        var message = parsed[:text] as String;
         storeMessage("CH_" + channelIndex.format("%d"), sender, message, channelName + ": " + sender);
     }
 
     private function storeDirectMessage(value as ByteArray) as Void {
-        var pubkeyOffset = (value[0] == RESP_CODE_CONTACT_MSG_V3) ? 4 : 1;
-        var textOffset = pubkeyOffset + 12;
-        if (value.size() <= textOffset) {
+        var parsed = MeshFrameParser.parseDirectMessage(value);
+        if (parsed == null) {
             return;
         }
-        var senderId = "";
-        for (var index = pubkeyOffset; index < pubkeyOffset + 6; index++) {
-            senderId += (value[index] & 0xFF).format("%02X");
-        }
+        var senderId = parsed[:senderHex] as String;
         var sender = resolveContactName(senderId);
-        var text = decodeText(value, textOffset);
-        if (text != null && text.length() > 0) {
-            storeMessage("CT_" + senderId, sender, text, "@" + sender);
-        }
+        var text = parsed[:text] as String;
+        storeMessage("CT_" + senderId, sender, text, "@" + sender);
     }
 
     private function resolveChannelName(channelIndex as Number) as String {
         var channelId = channelIndex.format("%d");
         try {
-            var stored = Storage.getValue("cfg_bg_channel_name_" + channelId);
+            var stored = Storage.getValue(StorageKeys.BG_CHANNEL_NAME_PREFIX + channelId);
             if (stored instanceof String) {
                 var channelName = stored as String;
                 if (channelName.length() > 0) {
@@ -443,7 +401,7 @@ class MeshBackgroundNodePoller {
 
     private function resolveContactName(senderId as String) as String {
         try {
-            var stored = Storage.getValue("cfg_bg_contact_name_" + senderId);
+            var stored = Storage.getValue(StorageKeys.BG_CONTACT_NAME_PREFIX + senderId);
             if (stored instanceof String) {
                 var contactName = stored as String;
                 if (contactName.length() > 0) {
@@ -454,19 +412,6 @@ class MeshBackgroundNodePoller {
             System.println("Background poll: contact name lookup failed");
         }
         return senderId;
-    }
-
-    private function decodeText(value as ByteArray, offset as Number) as String? {
-        var textBytes = [] as Array<Number>;
-        for (var index = offset; index < value.size(); index++) {
-            textBytes.add(value[index]);
-        }
-        try {
-            return StringUtil.utf8ArrayToString(textBytes);
-        } catch (e) {
-            System.println("Background poll: invalid message text");
-            return null;
-        }
     }
 
     private function storeMessage(targetId as String, sender as String, text as String, notificationTitle as String) as Void {
@@ -488,23 +433,17 @@ class MeshBackgroundNodePoller {
     }
 
     private function storeBattery(value as ByteArray) as Void {
-        if (value.size() < 3) {
+        var parsed = MeshFrameParser.parseBattery(value);
+        if (parsed == null) {
             return;
         }
-        var mv = (value[1] as Number) | ((value[2] as Number) << 8);
-        var percent = 0;
-        if (mv > 5000) {
-            percent = (((mv - 6600) * 100) / 1800).toNumber();
-        } else {
-            percent = (((mv - 3300) * 100) / 900).toNumber();
-        }
-        if (percent < 0) { percent = 0; }
-        if (percent > 100) { percent = 100; }
+        var mv = parsed[:mv] as Number;
+        var percent = parsed[:percent] as Number;
         var now = Time.now().value();
-        Storage.setValue("last_bg_battery_poll_time", now);
-        Storage.setValue("cached_node_battery_mv", mv);
-        Storage.setValue("cached_node_battery_percent", percent);
-        Storage.setValue("cached_node_battery_time", now);
+        Storage.setValue(StorageKeys.LAST_BG_BATTERY_POLL_TIME, now);
+        Storage.setValue(StorageKeys.CACHED_NODE_BATTERY_MV, mv);
+        Storage.setValue(StorageKeys.CACHED_NODE_BATTERY_PERCENT, percent);
+        Storage.setValue(StorageKeys.CACHED_NODE_BATTERY_TIME, now);
         _polledBatteryPercent = percent;
         System.println("Background poll: node battery updated: " + mv + " mV (" + percent + "%)");
     }

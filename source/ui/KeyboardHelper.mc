@@ -10,7 +10,7 @@ class KeyboardHelper {
 
     public static function openKeyboardForTarget(initialText as String, targetId as String?) as Void {
         if (WatchUi has :TextPicker) {
-            WatchUi.pushView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(targetId), WatchUi.SLIDE_DOWN);
+            WatchUi.switchToView(new WatchUi.TextPicker(initialText), new CustomTextPickerDelegate(targetId), WatchUi.SLIDE_DOWN);
         } else {
             WatchUi.showToast(I18n.get(Rez.Strings.ToastPickerUnavailable), null);
         }

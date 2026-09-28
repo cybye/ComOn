@@ -53,7 +53,4 @@ class NodeSimulatorDelegate extends WatchUi.Menu2InputDelegate {
         WatchUi.requestUpdate();
     }
 
-    public function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
 }

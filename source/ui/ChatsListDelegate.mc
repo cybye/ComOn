@@ -2,19 +2,39 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
 
-class ChatsListDelegate extends WatchUi.BehaviorDelegate {
+class ChatsListDelegate extends WatchUi.InputDelegate {
     private var _view as ChatsListView;
+    private var _navigationPending as Boolean = false;
+    private var _navigationRequestedAt as Number = 0;
 
     function initialize(view as ChatsListView) {
-        BehaviorDelegate.initialize();
+        InputDelegate.initialize();
         _view = view;
+        _view.onReturnToList = method(:onReturnToList);
+    }
+
+    public function onReturnToList() as Void {
+        _navigationPending = false;
+    }
+
+    private function beginNavigation() as Boolean {
+        var now = System.getTimer();
+        if (_navigationPending && (now - _navigationRequestedAt) < 1500) {
+            return false;
+        }
+        _navigationPending = true;
+        _navigationRequestedAt = now;
+        return true;
     }
 
     //! 2 O'CLOCK BUTTON (START / SELECT)
-    function onSelect() as Boolean {
-        var item = _view.getSelectedItem();
+    //! Helper to open a specific chat item dictionary
+    public function openItem(item as Dictionary?) as Boolean {
         if (item == null) {
-            System.println("ChatsListDelegate: onSelect - no item selected");
+            System.println("ChatsListDelegate: openItem - null item");
+            return true;
+        }
+        if (!beginNavigation()) {
             return true;
         }
 
@@ -35,10 +55,19 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
             ContactManager.selectContact(item[:cid] as String, title);
         }
 
-        System.println("ChatsListDelegate: onSelect -> opening ChatThreadView for " + title + " (" + tid + ")");
+        System.println("ChatsListDelegate: opening ChatThreadView for " + title + " (" + tid + ")");
         var view = new ChatThreadView(tid, title);
-        WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
+        WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_IMMEDIATE);
         return true;
+    }
+
+    private function selectCurrentItem() as Boolean {
+        var item = _view.getSelectedItem();
+        if (item == null) {
+            System.println("ChatsListDelegate: onSelect - no item selected");
+            return true;
+        }
+        return openItem(item);
     }
 
     //! 4 O'CLOCK BUTTON (BACK / LAP)
@@ -47,16 +76,24 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         return false;
     }
 
-    //! 7 O'CLOCK BUTTON (DOWN)
-    function onNextPage() as Boolean {
-        _view.nextItem();
-        return true;
-    }
-
-    //! 9 O'CLOCK BUTTON (UP - short press)
-    function onPreviousPage() as Boolean {
-        _view.previousItem();
-        return true;
+    //! Hardware Key Event Dispatcher
+    function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
+        var key = keyEvent.getKey();
+        System.println("ChatsListDelegate: onKey key=" + key);
+        if (key == WatchUi.KEY_ENTER || key == WatchUi.KEY_START) {
+            return selectCurrentItem();
+        } else if (key == WatchUi.KEY_DOWN) {
+            _view.nextItem();
+            return true;
+        } else if (key == WatchUi.KEY_UP) {
+            _view.previousItem();
+            return true;
+        } else if (key == WatchUi.KEY_MENU) {
+            return onMenu();
+        } else if (key == WatchUi.KEY_ESC) {
+            return onBack();
+        }
+        return false;
     }
 
     //! 9 O'CLOCK BUTTON (MENU / UP - long press)
@@ -76,6 +113,7 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         // Option A Crown Header tap (top area: scaled 110)
         // Directly opens Node Settings / Node Info Menu!
         if (ty <= DisplayProfile.scale(110)) {
+            if (!beginNavigation()) { return true; }
             System.println("ChatsListDelegate: Crown header tapped -> opening NodeSettingsMenu");
             getBleManager().suspendDiscoveryForUi();
             WatchUi.pushView(new NodeSettingsMenu(), new SettingsDelegate(), WatchUi.SLIDE_UP);
@@ -94,7 +132,8 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
         if (tappedIdx >= 0) {
             System.println("ChatsListDelegate: Card " + tappedIdx + " tapped -> selecting and opening");
             _view.selectIndex(tappedIdx);
-            return onSelect();
+            var item = _view.getItemAt(tappedIdx);
+            return openItem(item);
         }
 
         return false;
@@ -110,14 +149,13 @@ class ChatsListDelegate extends WatchUi.BehaviorDelegate {
             _view.previousItem();
             return true;
         } else if (dir == WatchUi.SWIPE_LEFT) {
-            return onSelect();
+            return selectCurrentItem();
         }
         return false;
     }
 
     private function openMainMenu() as Void {
-        if (getBleManager().isPairingInProgress()) {
-            WatchUi.showToast(I18n.get(Rez.Strings.StatusConnecting), null);
+        if (!beginNavigation()) {
             return;
         }
         getBleManager().suspendDiscoveryForUi();

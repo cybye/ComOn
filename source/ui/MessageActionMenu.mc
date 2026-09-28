@@ -28,7 +28,6 @@ class MessageActionDelegate extends WatchUi.Menu2InputDelegate {
     public function onSelect(item as WatchUi.MenuItem) as Void {
         var id = item.getId() as String;
         if (id.equals("ACT_REPLY_KEY")) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
             KeyboardHelper.openKeyboard("");
         } else if (id.equals("ACT_REPLY_CANNED")) {
             WatchUi.pushView(CannedMessageMenu.create(), new CannedMessageDelegate(null), WatchUi.SLIDE_LEFT);
@@ -42,7 +41,4 @@ class MessageActionDelegate extends WatchUi.Menu2InputDelegate {
         }
     }
 
-    public function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
 }

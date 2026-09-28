@@ -108,6 +108,10 @@ class MeshBleManager {
 
         virtualNode.setNotifyCallback(method(:onVirtualNotify));
 
+        // Connect MeshCoreEngine transport
+        var engine = MeshCoreEngine.getInstance();
+        engine.setTransportSender(method(:sendRaw));
+
         if (!_isDataField) {
             try {
                 var cachedPct = Storage.getValue("cached_node_battery_percent");
@@ -484,6 +488,7 @@ class MeshBleManager {
                     _reconnectTimer = null;
                 }
                 isConnected = true;
+                MeshCoreEngine.getInstance().setConnected(true);
                 _ignoredFragmentLogCount = 0;
                 stopScan();
                 _device = device;
@@ -517,6 +522,7 @@ class MeshBleManager {
                 }
                 _cccdRetryCount = 0;
                 isConnected = false;
+                MeshCoreEngine.getInstance().setConnected(false);
                 _isPairing = false;
                 isSyncing = false;
                 finishInboxPoll();
@@ -1036,113 +1042,59 @@ class MeshBleManager {
     }
 
     private function parseChannelMessage(value as ByteArray, notify as Boolean) as Void {
-        var isV3 = value[0] == MeshProtocol.RESP_CODE_CHANNEL_MSG_V3;
-        var offset = isV3 ? 4 : 1;
-        var textOffset = offset + 7;
-        if (value.size() <= textOffset) {
+        var parsed = MeshFrameParser.parseChannelMessage(value);
+        if (parsed == null) {
             return;
         }
 
-        var channelIndex = value[offset] as Number;
-        if (isV3) {
-            var snr = value[1] as Number;
-            if (snr > 127) { snr -= 256; }
-            loraSnr = (snr / 4).toNumber();
+        var channelIndex = parsed[:channelIdx] as Number;
+        if (parsed.hasKey(:snr) && parsed[:snr] != null) {
+            loraSnr = parsed[:snr] as Number;
         }
 
-        var textBytes = [] as Array<Number>;
-        for (var index = textOffset; index < value.size(); index++) {
-            textBytes.add(value[index]);
+        var sender = parsed[:sender] as String;
+        var messageText = parsed[:text] as String;
+        var targetId = "CH_" + channelIndex;
+        lastSender = sender;
+        lastReceivedMessage = messageText;
+        ChatHistoryManager.addIncomingMessage(targetId, sender, messageText);
+        if (notify && onMessageCallback != null) {
+            onMessageCallback.invoke(sender, messageText, targetId);
         }
-
-        try {
-            var text = StringUtil.utf8ArrayToString(textBytes);
-            if (text == null || text.length() == 0) {
-                return;
-            }
-            var sender = "Mesh";
-            var messageText = text;
-            var separator = text.find(": ");
-            if (separator != null && separator > 0) {
-                sender = text.substring(0, separator);
-                messageText = text.substring(separator + 2, text.length());
-            }
-            var targetId = "CH_" + channelIndex;
-            lastSender = sender;
-            lastReceivedMessage = messageText;
-            ChatHistoryManager.addIncomingMessage(targetId, sender, messageText);
-            if (notify && onMessageCallback != null) {
-                onMessageCallback.invoke(sender, messageText, targetId);
-            }
-            WatchUi.requestUpdate();
-        } catch (e) {
-            System.println("BLE channel message parse notice: " + e.getErrorMessage());
-        }
+        WatchUi.requestUpdate();
     }
 
     //! Parse an incoming direct message frame (RESP_CODE_CONTACT_MSG = 7 or V3 = 16)
-    //! Frame layout v1 (first=7):  [code(1), pubkey_prefix(6), path_len(1), txt_type(1), timestamp(4), text...]
-    //! Frame layout v3 (first=16): [code(1), snr(1), reserved(2), pubkey_prefix(6), path_len(1), txt_type(1), timestamp(4), text...]
     private function parseDirectMessage(value as ByteArray, notify as Boolean) as Void {
-        try {
-            var isV3 = (value[0] == MeshProtocol.RESP_CODE_CONTACT_MSG_V3);
-            // v1: pubkey starts at offset 1; v3: pubkey starts at offset 4 (after snr + 2 reserved)
-            var pubkeyOffset = isV3 ? 4 : 1;
-            var textOffset   = pubkeyOffset + 6 + 1 + 1 + 4; // pubkey(6) + path_len(1) + txt_type(1) + timestamp(4)
-
-            if (value.size() <= textOffset) {
-                System.println("BLE parseDirectMessage: frame too short (" + value.size() + " bytes), dropping");
-                return;
-            }
-
-            // Update SNR from v3 header if present
-            if (isV3) {
-                var snr = value[1] as Number;
-                if (snr > 127) { snr -= 256; }
-                loraSnr = (snr / 4).toNumber();
-            }
-
-            // Build hex string of sender pubkey prefix (6 bytes)
-            var senderHex = "";
-            for (var k = pubkeyOffset; k < pubkeyOffset + 6 && k < value.size(); k++) {
-                var b = value[k] & 0xFF;
-                senderHex += b.format("%02X");
-            }
-
-            // Resolve sender name from ContactManager (case-insensitive prefix match)
-            var sender = senderHex;
-            var ct = ContactManager.getContactById(senderHex);
-            if (ct != null) {
-                var n = ct[:name];
-                if (n != null && (n as String).length() > 0) {
-                    sender = n as String;
-                }
-            }
-
-            // Extract text bytes
-            var textBytes = [] as Array<Number>;
-            for (var i = textOffset; i < value.size(); i++) {
-                textBytes.add(value[i]);
-            }
-            var text = StringUtil.utf8ArrayToString(textBytes);
-            if (text == null || text.length() == 0) {
-                System.println("BLE parseDirectMessage: empty text from " + senderHex);
-                return;
-            }
-
-            // targetId: use sender's contact ID so the message lands in the right DM thread
-            var targetId = "CT_" + senderHex;
-            lastSender = sender;
-            lastReceivedMessage = text;
-            System.println("BLE parseDirectMessage: DM from " + sender + " (" + senderHex + "): " + text);
-            ChatHistoryManager.addIncomingMessage(targetId, sender, text);
-            if (notify && onMessageCallback != null) {
-                onMessageCallback.invoke(sender, text, targetId);
-            }
-            WatchUi.requestUpdate();
-        } catch (e) {
-            System.println("BLE parseDirectMessage notice: " + e.getErrorMessage());
+        var parsed = MeshFrameParser.parseDirectMessage(value);
+        if (parsed == null) {
+            return;
         }
+
+        if (parsed.hasKey(:snr) && parsed[:snr] != null) {
+            loraSnr = parsed[:snr] as Number;
+        }
+
+        var senderHex = parsed[:senderHex] as String;
+        var sender = senderHex;
+        var ct = ContactManager.getContactById(senderHex);
+        if (ct != null) {
+            var n = ct[:name];
+            if (n != null && (n as String).length() > 0) {
+                sender = n as String;
+            }
+        }
+
+        var text = parsed[:text] as String;
+        var targetId = "CT_" + senderHex;
+        lastSender = sender;
+        lastReceivedMessage = text;
+        System.println("BLE parseDirectMessage: DM from " + sender + " (" + senderHex + "): " + text);
+        ChatHistoryManager.addIncomingMessage(targetId, sender, text);
+        if (notify && onMessageCallback != null) {
+            onMessageCallback.invoke(sender, text, targetId);
+        }
+        WatchUi.requestUpdate();
     }
 
     public function startPeriodicTelemetryTimer() as Void {
@@ -1182,30 +1134,22 @@ class MeshBleManager {
     }
 
     private function parseBattery(value as ByteArray) as Void {
-        if (value.size() < 3) {
+        var parsed = MeshFrameParser.parseBattery(value);
+        if (parsed == null) {
             return;
         }
-        var mv = (value[1] as Number) | ((value[2] as Number) << 8);
+        var mv = parsed[:mv] as Number;
+        var percent = parsed[:percent] as Number;
         nodeBatteryMv = mv;
-        var percent = 0;
-        if (mv > 5000) {
-            // 2S battery pack (6.6V - 8.4V)
-            percent = (((mv - 6600) * 100) / 1800).toNumber();
-        } else {
-            // 1S LiPo pack (3.3V - 4.2V)
-            percent = (((mv - 3300) * 100) / 900).toNumber();
-        }
-        if (percent < 0) { percent = 0; }
-        if (percent > 100) { percent = 100; }
         nodeBatteryPercent = percent;
         System.println("Node battery: " + nodeBatteryMv + " mV (estimated " + nodeBatteryPercent + "%)");
         if (!_isDataField) {
             try {
-                Storage.setValue("cached_node_battery_mv", mv);
-                Storage.setValue("cached_node_battery_percent", percent);
-                Storage.setValue("cached_node_battery_time", Time.now().value());
+                Storage.setValue(StorageKeys.CACHED_NODE_BATTERY_MV, mv);
+                Storage.setValue(StorageKeys.CACHED_NODE_BATTERY_PERCENT, percent);
+                Storage.setValue(StorageKeys.CACHED_NODE_BATTERY_TIME, Time.now().value());
                 if (percent > 20) {
-                    Storage.deleteValue("cfg_bg_low_battery_notified");
+                    Storage.deleteValue(StorageKeys.BG_LOW_BATTERY_NOTIFIED);
                 }
             } catch (e) {
                 // ignore
@@ -1279,90 +1223,31 @@ class MeshBleManager {
     }
 
     private function parseBinaryChannel(value as ByteArray) as Void {
-        try {
-            if (value.size() >= 2) {
-                var chIdx = value[1] as Number;
-                var nameBytes = [] as Array<Number>;
-                for (var i = 2; i < 34 && i < value.size() && value[i] != 0; i++) {
-                    nameBytes.add(value[i]);
-                }
-                var nameStr = StringUtil.utf8ArrayToString(nameBytes);
-                if (nameStr == null || nameStr.length() == 0) {
-                    if (chIdx == 0) {
-                        nameStr = "public";
-                    } else {
-                        return; // Empty channel slot
-                    }
-                }
-                System.println("BLE parsed channel " + chIdx + ": " + nameStr);
-                if (_isFullSync) {
-                    ContactManager.addSyncChannel(chIdx, nameStr);
-                } else {
-                    ContactManager.addChannel(chIdx, nameStr);
-                }
+        var parsed = MeshFrameParser.parseBinaryChannel(value);
+        if (parsed != null) {
+            var chIdx = parsed[:channelIdx] as Number;
+            var nameStr = parsed[:name] as String;
+            System.println("BLE parsed channel " + chIdx + ": " + nameStr);
+            if (_isFullSync) {
+                ContactManager.addSyncChannel(chIdx, nameStr);
+            } else {
+                ContactManager.addChannel(chIdx, nameStr);
             }
-        } catch (e) {
-            System.println("parseBinaryChannel notice: " + e.getErrorMessage());
         }
     }
 
     private function parseBinaryContact(value as ByteArray) as Void {
-        try {
-            if (value.size() >= 132) {
-                // Official MeshCore Hardware format (148 bytes total):
-                // Byte 0: 0x03 (RESP_CODE_CONTACT)
-                // Bytes 1..32: 32-byte Public Key
-                // Bytes 33..99: adv_type, flags, out_path_len, out_path (64 bytes)
-                // Bytes 100..131: adv_name (32 bytes null-terminated UTF-8)
-                var idHex = "";
-                for (var k = 1; k <= 6 && k < value.size(); k++) {
-                    var b = value[k] & 0xFF;
-                    idHex += b.format("%02X");
-                }
-
-                var advType = (value.size() > 33) ? (value[33] as Number) : 1;
-
-                var nameBytes = [] as Array<Number>;
-                for (var n = 100; n < 132 && n < value.size() && value[n] != 0; n++) {
-                    nameBytes.add(value[n]);
-                }
-                var nameStr = StringUtil.utf8ArrayToString(nameBytes);
-                if (nameStr == null || nameStr.length() == 0) {
-                    nameStr = "Node " + idHex;
-                }
-
-                System.println("BLE parsed contact (HW): id=" + idHex + " name=" + nameStr + " advType=" + advType);
-                if (_isFullSync) {
-                    ContactManager.addSyncContact(idHex, nameStr, advType);
-                } else {
-                    ContactManager.addContact(idHex, nameStr, advType);
-                }
-            } else if (value.size() >= 4) {
-                // Compact / Simulator format:
-                // [3, idLen, idBytes..., nameLen, nameBytes...]
-                var idLen = value[1] as Number;
-                if (value.size() >= 2 + idLen + 1) {
-                    var idBytes = [] as Array<Number>;
-                    for (var i = 2; i < 2 + idLen; i++) { idBytes.add(value[i]); }
-                    var idStr = StringUtil.utf8ArrayToString(idBytes);
-
-                    var nameLenIdx = 2 + idLen;
-                    var nameLen = value[nameLenIdx] as Number;
-                    if (value.size() >= nameLenIdx + 1 + nameLen) {
-                        var nameBytes2 = [] as Array<Number>;
-                        for (var j = nameLenIdx + 1; j < nameLenIdx + 1 + nameLen; j++) { nameBytes2.add(value[j]); }
-                        var nameStr2 = StringUtil.utf8ArrayToString(nameBytes2);
-                        System.println("BLE parsed contact (compact): id=" + idStr + " name=" + nameStr2);
-                        if (_isFullSync) {
-                            ContactManager.addSyncContact(idStr, nameStr2, 1);
-                        } else {
-                            ContactManager.addContact(idStr, nameStr2, 1);
-                        }
-                    }
-                }
+        var parsed = MeshFrameParser.parseBinaryContact(value);
+        if (parsed != null) {
+            var id = parsed[:id] as String;
+            var nameStr = parsed[:name] as String;
+            var advType = parsed[:advType] as Number;
+            System.println("BLE parsed contact: id=" + id + " name=" + nameStr + " advType=" + advType);
+            if (_isFullSync) {
+                ContactManager.addSyncContact(id, nameStr, advType);
+            } else {
+                ContactManager.addContact(id, nameStr, advType);
             }
-        } catch (e) {
-            System.println("parseBinaryContact notice: " + e.getErrorMessage());
         }
     }
 

@@ -3,15 +3,27 @@ import Toybox.Graphics;
 import Toybox.Lang;
 
 class ChatsListView extends WatchUi.View {
+    public var onReturnToList as (Method() as Void)? = null;
     private var _selectedIndex as Number = 0;
     private var _cachedItems as Array<Dictionary> = [] as Array<Dictionary>;
     private var _screenW as Number = 454;
     private var _fontBody as FontRef = Graphics.FONT_SYSTEM_TINY;
     private var _fontCaption as FontRef = Graphics.FONT_SYSTEM_XTINY;
+    private var _isDirty as Boolean = true;
 
     function initialize() {
         View.initialize();
         _screenW = DisplayProfile.screenW;
+        _isDirty = true;
+    }
+
+    public function markDirty() as Void {
+        _isDirty = true;
+        WatchUi.requestUpdate();
+    }
+
+    public function onEngineStatusChanged(isConnected as Boolean, batPct as Number?, rssi as Number?, snr as Number?) as Void {
+        markDirty();
     }
 
     function onLayout(dc as Graphics.Dc) as Void {
@@ -22,6 +34,10 @@ class ChatsListView extends WatchUi.View {
     }
 
     function onShow() as Void {
+        if (onReturnToList != null) {
+            onReturnToList.invoke();
+        }
+        _isDirty = true;
         updateItemList();
         WatchUi.requestUpdate();
         // Registered here so queued notification selections are delivered once a view stack exists
@@ -113,6 +129,10 @@ class ChatsListView extends WatchUi.View {
     }
 
     public function getItemsCount() as Number {
+        if (_isDirty || _cachedItems.size() == 0) {
+            updateItemList();
+            _isDirty = false;
+        }
         return _cachedItems.size();
     }
 
@@ -120,14 +140,26 @@ class ChatsListView extends WatchUi.View {
         return _selectedIndex;
     }
 
-    public function getSelectedItem() as Dictionary? {
-        if (_selectedIndex >= 0 && _selectedIndex < _cachedItems.size()) {
-            return _cachedItems[_selectedIndex];
+    public function getItemAt(idx as Number) as Dictionary? {
+        if (_isDirty || _cachedItems.size() == 0) {
+            updateItemList();
+            _isDirty = false;
+        }
+        if (idx >= 0 && idx < _cachedItems.size()) {
+            return _cachedItems[idx];
         }
         return null;
     }
 
+    public function getSelectedItem() as Dictionary? {
+        return getItemAt(_selectedIndex);
+    }
+
     public function selectIndex(idx as Number) as Void {
+        if (_isDirty || _cachedItems.size() == 0) {
+            updateItemList();
+            _isDirty = false;
+        }
         if (idx >= 0 && idx < _cachedItems.size()) {
             _selectedIndex = idx;
             WatchUi.requestUpdate();
@@ -135,6 +167,10 @@ class ChatsListView extends WatchUi.View {
     }
 
     public function nextItem() as Void {
+        if (_isDirty || _cachedItems.size() == 0) {
+            updateItemList();
+            _isDirty = false;
+        }
         if (_cachedItems.size() > 0 && _selectedIndex < _cachedItems.size() - 1) {
             _selectedIndex++;
             WatchUi.requestUpdate();
@@ -142,6 +178,10 @@ class ChatsListView extends WatchUi.View {
     }
 
     public function previousItem() as Void {
+        if (_isDirty || _cachedItems.size() == 0) {
+            updateItemList();
+            _isDirty = false;
+        }
         if (_cachedItems.size() > 0 && _selectedIndex > 0) {
             _selectedIndex--;
             WatchUi.requestUpdate();
@@ -194,7 +234,10 @@ class ChatsListView extends WatchUi.View {
         drawCrownHeader(dc, cx, _fontCaption, _fontBody, bleMgr);
 
         // 2. CHAT CARDS LIST (WHATSAPP STYLE - CENTERED AT EQUATOR)
-        updateItemList();
+        if (_isDirty) {
+            updateItemList();
+            _isDirty = false;
+        }
         var count = _cachedItems.size();
 
         if (count == 0) {

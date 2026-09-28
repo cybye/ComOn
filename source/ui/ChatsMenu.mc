@@ -129,8 +129,4 @@ class ChatsDelegate extends WatchUi.Menu2InputDelegate {
         var view = new ChatThreadView(id, label);
         WatchUi.pushView(view, new ChatThreadDelegate(view), WatchUi.SLIDE_LEFT);
     }
-
-    public function onBack() as Void {
-        WatchUi.popView(WatchUi.SLIDE_RIGHT);
-    }
 }

@@ -24,6 +24,9 @@ class MeshCoreApp extends Application.AppBase {
 
     (:background)
     function onStart(state as Dictionary?) as Void {
+        _isForeground = true;
+        Storage.setValue(StorageKeys.FOREGROUND_ACTIVE, true);
+        Storage.setValue(StorageKeys.FOREGROUND_ACTIVE_AT, Time.now().value());
         if (state != null && state.hasKey(:launchedFromNotification)) {
             var action = state.get(:launchedFromNotification);
             if (action instanceof String) {
@@ -33,13 +36,13 @@ class MeshCoreApp extends Application.AppBase {
     }
 
     private function initForeground() as Void {
-        Storage.setValue("cfg_notif_incoming_batch", I18n.get(Rez.Strings.NotifIncomingBatch));
-        Storage.setValue("cfg_notif_incoming_msg", I18n.get(Rez.Strings.NotifIncomingMsg));
-        Storage.setValue("cfg_notif_open_chat", I18n.get(Rez.Strings.NotifActionOpenChat));
-        Storage.setValue("cfg_notif_open_chats", I18n.get(Rez.Strings.NotifActionOpenChats));
-        Storage.setValue("cfg_notif_reply", I18n.get(Rez.Strings.NotifActionReply));
-        Storage.setValue("cfg_notif_position", I18n.get(Rez.Strings.NotifActionPosition));
-        Storage.setValue("cfg_notif_ok", I18n.get(Rez.Strings.NotifActionOk));
+        Storage.setValue(StorageKeys.NOTIF_INCOMING_BATCH, I18n.get(Rez.Strings.NotifIncomingBatch));
+        Storage.setValue(StorageKeys.NOTIF_INCOMING_MSG, I18n.get(Rez.Strings.NotifIncomingMsg));
+        Storage.setValue(StorageKeys.NOTIF_OPEN_CHAT, I18n.get(Rez.Strings.NotifActionOpenChat));
+        Storage.setValue(StorageKeys.NOTIF_OPEN_CHATS, I18n.get(Rez.Strings.NotifActionOpenChats));
+        Storage.setValue(StorageKeys.NOTIF_REPLY, I18n.get(Rez.Strings.NotifActionReply));
+        Storage.setValue(StorageKeys.NOTIF_POSITION, I18n.get(Rez.Strings.NotifActionPosition));
+        Storage.setValue(StorageKeys.NOTIF_OK, I18n.get(Rez.Strings.NotifActionOk));
         ContactManager.loadFromStorage();
         ContactManager.ensureBackgroundIdentityCaches();
         ChatHistoryManager.reloadFromStorage();
@@ -58,6 +61,7 @@ class MeshCoreApp extends Application.AppBase {
             (_bleManager as MeshBleManager).onMessageCallback = method(:onAppMessageReceived);
             (_bleManager as MeshBleManager).positionProvider = method(:getFormattedPosition);
             (_bleManager as MeshBleManager).sosProvider = method(:getFormattedSos);
+            MeshCoreEngine.getInstance().setOnMessageListener(method(:onAppMessageReceived));
         }
         TelemetryProvider.getInstance().startTracking();
     }
@@ -80,8 +84,8 @@ class MeshCoreApp extends Application.AppBase {
             _heartbeatTimer = null;
         }
         if (_isForeground) {
-            Storage.deleteValue(STORAGE_FOREGROUND_ACTIVE);
-            Storage.deleteValue("cfg_foreground_active_at");
+            Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE);
+            Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE_AT);
         }
         if (!(Toybox has :WatchUi) || _bleManager == null) {
             return;
@@ -91,7 +95,7 @@ class MeshCoreApp extends Application.AppBase {
         (_bleManager as MeshBleManager).releaseNode(0);
 
         // Schedule background message check according to configured interval
-        var intervalSecs = Storage.getValue("bgInterval");
+        var intervalSecs = Storage.getValue(StorageKeys.BG_INTERVAL);
         if (intervalSecs == null) {
             intervalSecs = 300; // Default: 5 min
         }
@@ -126,7 +130,7 @@ class MeshCoreApp extends Application.AppBase {
 
     function getInitialView() as [Views] or [Views, InputDelegates] {
         _isForeground = true;
-        Storage.setValue(STORAGE_FOREGROUND_ACTIVE, true);
+        Storage.setValue(StorageKeys.FOREGROUND_ACTIVE, true);
         onForegroundHeartbeat();
         if (_heartbeatTimer == null) {
             _heartbeatTimer = new SoftTimer();
@@ -139,11 +143,15 @@ class MeshCoreApp extends Application.AppBase {
             _launchAction = null;
         }
         var view = new ChatsListView();
+        var engine = MeshCoreEngine.getInstance();
+        engine.setOnChannelsChangedListener(view.method(:markDirty));
+        engine.setOnContactsChangedListener(view.method(:markDirty));
+        engine.setOnStatusChangedListener(view.method(:onEngineStatusChanged));
         return [ view, new ChatsListDelegate(view) ];
     }
 
     public function onForegroundHeartbeat() as Void {
-        Storage.setValue("cfg_foreground_active_at", Time.now().value());
+        Storage.setValue(StorageKeys.FOREGROUND_ACTIVE_AT, Time.now().value());
     }
 
     public function getBleManager() as MeshBleManager {
