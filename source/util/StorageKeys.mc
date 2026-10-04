@@ -14,6 +14,9 @@ module StorageKeys {
     public const BG_NODE_UNAVAILABLE_NOTIFIED   as String = "cfg_bg_node_unavailable_notified";
     public const BG_LOW_BATTERY_NOTIFIED       as String = "cfg_bg_low_battery_notified";
     public const LAST_BG_BATTERY_POLL_TIME     as String = "last_bg_battery_poll_time";
+    public const BG_QUIET_MODE                 as String = "cfg_bg_quiet_mode";          // Boolean, default true: skip polls in sleep window / DND
+    public const BG_FAIL_STREAK                as String = "cfg_bg_fail_streak";         // Number of consecutive runs without node connection
+    public const BG_UNPAIR_DROPS_BOND          as String = "cfg_bg_unpair_drops_bond";   // Set if unpairDevice() was observed to remove the system bond
 
     // Contact & Channel Identity Caches (Foreground -> Background)
     public const BG_CONTACT_NAME_PREFIX        as String = "cfg_bg_contact_name_";

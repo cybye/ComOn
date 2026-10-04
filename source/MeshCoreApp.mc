@@ -99,6 +99,8 @@ class MeshCoreApp extends Application.AppBase {
         if (intervalSecs == null) {
             intervalSecs = 300; // Default: 5 min
         }
+        // Fresh start for the unreachable-node backoff after a foreground session
+        Storage.deleteValue(StorageKeys.BG_FAIL_STREAK);
 
         if ((intervalSecs as Number) > 0) {
             try {

@@ -53,4 +53,15 @@ class MeshBackgroundDiagnostics {
         var stored = Storage.getValue(STORAGE_KEY);
         return (stored instanceof Dictionary) ? (stored as Dictionary) : null;
     }
-}
+
+    //! True if the previous run never reached finishRun(), i.e. it was most
+    //! likely terminated by the system (30 s background limit) mid-poll.
+    public static function wasPreviousRunUnfinished() as Boolean {
+        var stored = Storage.getValue(STORAGE_KEY);
+        if (!(stored instanceof Dictionary) || !stored.hasKey("outcome")) {
+            return false;
+        }
+        var outcome = stored["outcome"];
+        return (outcome instanceof String) && (outcome as String).equals("running");
+    }
+}

@@ -19,6 +19,10 @@ class SettingsMenu extends WatchUi.Menu2 {
         }
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingBgCheck), getBgIntervalLabel(bgInt), "SET_BG_INTERVAL", null));
 
+        // Pause background checks during sleep window / Do Not Disturb (default on)
+        var quietOn = Storage.getValue(StorageKeys.BG_QUIET_MODE) != false;
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingBgQuiet), quietOn ? I18n.get(Rez.Strings.SettingActiveOn) : I18n.get(Rez.Strings.SettingInactiveOff), "SET_BG_QUIET", null));
+
         // Wardriving FIT Logging (defensive)
         var fitLog = true;
         try {
@@ -105,6 +109,11 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
             Storage.setValue("bgInterval", next);
             item.setSubLabel(SettingsMenu.getBgIntervalLabel(next));
             WatchUi.requestUpdate();
+        } else if (id.equals("SET_BG_QUIET")) {
+            var nextQuiet = !(Storage.getValue(StorageKeys.BG_QUIET_MODE) != false);
+            Storage.setValue(StorageKeys.BG_QUIET_MODE, nextQuiet);
+            item.setSubLabel(nextQuiet ? I18n.get(Rez.Strings.SettingActiveOn) : I18n.get(Rez.Strings.SettingInactiveOff));
+            WatchUi.requestUpdate();
         } else if (id.equals("SET_WARDRIVING")) {
             var enabled = Storage.getValue("fitLoggingEnabled");
             if (!(enabled instanceof Boolean)) { enabled = true; }
@@ -142,7 +151,17 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
             } else {
                 var outcome = latest["outcome"] as String;
                 var state = (latest.hasKey("state") && latest["state"] != null) ? (latest["state"] as String) : "unknown";
-                WatchUi.showToast("Background: " + outcome + " (" + state + ")", null);
+                var detail = "";
+                var startedAt = latest.hasKey("startedAt") ? latest["startedAt"] : null;
+                var endedAt = latest.hasKey("endedAt") ? latest["endedAt"] : null;
+                if (startedAt instanceof Number && endedAt instanceof Number) {
+                    detail = " " + ((endedAt as Number) - (startedAt as Number)) + "s";
+                }
+                var streak = Storage.getValue(StorageKeys.BG_FAIL_STREAK);
+                if (streak instanceof Number && (streak as Number) > 0) {
+                    detail += " fail x" + streak;
+                }
+                WatchUi.showToast("Background: " + outcome + " (" + state + ")" + detail, null);
             }
         } else if (id.equals("SET_SIM")) {
             WatchUi.pushView(NodeSimulatorMenu.create(), new NodeSimulatorDelegate(), WatchUi.SLIDE_LEFT);

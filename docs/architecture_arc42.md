@@ -171,25 +171,47 @@ sequenceDiagram
     autonumber
     participant OS as Garmin OS (Scheduler)
     participant BG as MeshBackgroundDelegate
+    participant QP as MeshQuietPolicy
     participant BLE as BluetoothLowEnergy
     participant Node as MeshCore Node
     participant Notif as Toybox.Notifications
     participant Stor as Toybox.Application.Storage
 
-    OS->>BG: onTemporalEvent() [alle 5-60 Min]
-    BG->>BLE: Quick Connect zu MeshCore Node
-    BLE->>Node: CMD_SYNC_NEXT_MESSAGE (0x05)
-    alt Neue Nachricht wartet im Puffer
-        Node-->>BLE: UTF-8 Nachricht ("Alex: Treffpunkt Hütte")
-        BLE-->>BG: onMessageReceived
-        BG->>Stor: In Chat-Historie speichern
-        BG->>Notif: showNotification("Mesh: Alex", "Treffpunkt Hütte", Actions)
-        Notif-->>OS: Haptik (Vibration profile) + System Pop-up
-    else Keine Nachricht (Posteingang leer)
-        Node-->>BLE: RESP_CODE_OK (0x00)
+    OS->>BG: onTemporalEvent()
+    BG->>QP: evaluate() [Sleep Window & DND Check]
+    alt Im Schlaf-Fenster (UserProfile)
+        QP-->>BG: skip (quiet_sleep, wakeDelta)
+        BG->>OS: registerForTemporalEvent(wakeDelta) [Pause bis Aufwachen]
+        BG->>OS: Background.exit(null)
+    else Do Not Disturb aktiv (DND)
+        QP-->>BG: skip (quiet_dnd)
+        BG->>OS: registerForTemporalEvent(30 min)
+        BG->>OS: Background.exit(null)
+    else Normaler Wachbetrieb
+        BG->>BLE: Quick Connect (Budget 8s)
+        alt Node erreichbar
+            BLE->>Node: CMD_SYNC_NEXT_MESSAGE (0x05)
+            alt Neue Nachricht wartet im Puffer
+                Node-->>BLE: UTF-8 Nachricht ("Alex: Treffpunkt Hütte")
+                BLE-->>BG: onMessageReceived
+                BG->>Stor: In Chat-Historie speichern
+                BG->>Notif: showNotification("Mesh: Alex", "Treffpunkt Hütte", Actions)
+                Notif-->>OS: Haptik (Vibration profile) + System Pop-up
+            else Keine Nachricht (Posteingang leer)
+                Node-->>BLE: RESP_CODE_OK (0x00)
+            end
+            BG->>Stor: resetFailStreak (0)
+            BG->>BLE: releaseDevice() [unpair & Bond-Schutz]
+            BG->>OS: registerForTemporalEvent(configuredInterval)
+        else Node nicht erreichbar / Timeout
+            BG->>Stor: incrementFailStreak()
+            Note over BG,Stor: Exponentieller Backoff nach 3x Fail:<br/>5m -> 10m -> 20m -> 40m -> 60m
+            BG->>OS: registerForTemporalEvent(backoffInterval)
+        end
+        BG->>OS: Background.exit(summary)
     end
-    BG->>OS: Background.exit(newCount)
 ```
+
 
 ### 6.2 Szenario: Activity Data Field Telemetrie & Wardriving
 
@@ -594,6 +616,16 @@ flowchart TD
       - **MeshCoreEngine:** Vollständige Entkopplung der MeshCore-Fachlogik (`MeshCoreEngine.mc`, `MeshFrameParser.mc`, `StorageKeys.mc`, `NotificationBuilder.mc`) von den reinen BLE-Transfers.
       - **Synchroner Datenzugriff:** `ChatsListView.getItemAt(idx)` und `getSelectedItem()` prüfen den Dirty-Status und synchronisieren den Kachelspeicher (`updateItemList()`) bedarfsgesteuert sofort, noch vor der Auswertung des Index.
       - **Deterministische Touch-Navigation:** `ChatsListDelegate.onTap()` ermittelt den Index via `getCardIndexAt(tx, ty)`, aktualisiert die Ansicht und öffnet die Konversation direkt via `openItem(item)` ohne fehleranfällige Abhängigkeit von asynchronen Render-Zyklen.
+
+* **ADR 39: Intelligentes Background-Poller Gating (Quiet Hours, DND & Fail-Streak Backoff):**
+    1. *Kontext & Problemstellung*:
+       Der periodische Hintergrund-Poller (5 Minuten) führte nachts zu zwei kritischen Problemen: (a) Die Uhr stürzte ab oder schaltete sich wegen Akku-Erschöpfung bzw. Watchdog-Panics komplett aus; (b) Garmins Firstbeat-Schlaftracking erkannte keinen Schlaf, da permanente BLE-Radio-Wakeups, Sensor-Interrupts und Verbindungsabbrüche die Ruhephasen störten. Zudem lief der Poller bei unerreichbarem Node blind alle 5 Minuten ins Timeout.
+    2. *Lösung & Implementierung*:
+       - **Statischer Schlaf-Anker (`MeshQuietPolicy`):** Liest die in Garmin Connect konfigurierten `sleepTime` und `wakeTime` via `Toybox.UserProfile`. Befindet sich die Uhr im Schlaffenster, wird der Poller sofort beendet (< 1 ms CPU-Zeit, 0 BLE-Aktivität) und das nächste Temporal-Event gezielt auf die Aufwachzeit registriert (`Background.registerForTemporalEvent(wakeDelta)`). Dies entkoppelt den Poller vollständig von heuristischer Schlaferkennung.
+       - **Do Not Disturb (DND) Gating:** Bei manuellem DND oder Theater-Modus (`System.getDeviceSettings().doNotDisturb`) wird das Polling übersprungen und ein schonender Re-Check nach 30 Minuten eingeplant.
+       - **Budget-Kürzung:** Reduzierung des Scan-/Connect-Timeouts (`POLL_TIMEOUT_MS`) von 12 s auf 8 s.
+       - **Exponentieller Failure-Backoff:** Bei wiederholter Nichterreichbarkeit des Nodes (`failStreak >= 3`) verdoppelt sich das Polling-Intervall schrittweise (5m -> 10m -> 20m -> 40m -> 60m), um unnötigen Radio-Duty-Cycle zu eliminieren. Bei erfolgreicher Verbindung oder neuem App-Start wird der Streak sofort auf 0 zurückgesetzt.
+       - **Verbindungsfreigabe mit Bond-Schutz (`releaseDevice`):** Nach Abschluss des Polls wird die Verbindung über `unpairDevice()` getrennt, wobei das Fortbestehen des System-Bonds überwacht wird (`BG_UNPAIR_DROPS_BOND`).
 
 ---
 

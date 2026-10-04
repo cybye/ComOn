@@ -86,6 +86,7 @@
     <string id="SettingBgCheckSub">$1$ min</string>
     <string id="SettingBgDisabled">Off</string>
     <string id="SettingWardriving">Wardriving FIT-Log</string>
+    <string id="SettingBgQuiet">Pause in sleep/DND</string>
     <string id="SettingEnabled">ON</string>
     <string id="SettingDisabled">OFF</string>
     <string id="SettingActiveOn">Active (ON)</string>

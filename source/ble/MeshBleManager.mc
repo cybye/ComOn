@@ -136,6 +136,7 @@ class MeshBleManager {
 
     public function registerProfile() as Void {
         try {
+            BluetoothLowEnergy.setConnectionStrategy(BluetoothLowEnergy.CONNECTION_STRATEGY_SECURE_PAIR_BOND);
             var profileDef = {
                 :uuid => nusServiceUuid,
                 :characteristics => [
@@ -263,7 +264,7 @@ class MeshBleManager {
             _pairTimeoutTimer = null;
         }
         clearTxQueue();
-        if (_device != null) {
+        if (_device != null && !(_device as BluetoothLowEnergy.Device).isBonded()) {
             try {
                 BluetoothLowEnergy.unpairDevice(_device as BluetoothLowEnergy.Device);
             } catch (e) {
@@ -277,6 +278,15 @@ class MeshBleManager {
     public function onPairTimeout() as Void {
         _pairTimeoutTimer = null;
         if (!_isPairing || isConnected) {
+            return;
+        }
+        if (_device != null && (_device as BluetoothLowEnergy.Device).isBonded()) {
+            if ((_device as BluetoothLowEnergy.Device).isConnected()) {
+                System.println("BLE pair timeout: bonded device is connected; adopting it");
+                procConnectedStateChanged(_device, BluetoothLowEnergy.CONNECTION_STATE_CONNECTED);
+            } else {
+                System.println("BLE pair timeout: keeping system bond and awaiting connection state");
+            }
             return;
         }
         System.println("BLE pair timeout -> cancelling attempt & restarting scan");
@@ -367,13 +377,6 @@ class MeshBleManager {
         if (isSimulated) {
             simulateDisconnect(updateUi);
         } else {
-            if (_device != null) {
-                try {
-                    BluetoothLowEnergy.unpairDevice(_device);
-                } catch (e) {
-                    System.println("unpairDevice notice: " + e.getErrorMessage());
-                }
-            }
             isConnected = false;
             clearFragmentBuffer();
             isSyncing = false;
@@ -489,6 +492,7 @@ class MeshBleManager {
                 }
                 isConnected = true;
                 MeshCoreEngine.getInstance().setConnected(true);
+                System.println("BLE system bond state=" + device.isBonded());
                 _ignoredFragmentLogCount = 0;
                 stopScan();
                 _device = device;

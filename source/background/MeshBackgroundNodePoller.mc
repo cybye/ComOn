@@ -9,7 +9,9 @@ import Toybox.Time;
 
 (:background)
 class MeshBackgroundNodePoller {
-    private static const POLL_TIMEOUT_MS as Number = 12000;
+    // Overall budget per run. Only enforced reactively on BLE callbacks (Toybox.Timer is not
+    // available in background); the system's 30 s background limit is the final backstop.
+    private static const POLL_TIMEOUT_MS as Number = 8000;
     private static const MAX_BACKGROUND_MESSAGES as Number = 5;
     private static const BATTERY_POLL_INTERVAL_SECS as Number = 3600;
 
@@ -44,6 +46,7 @@ class MeshBackgroundNodePoller {
 
     public function start() as Void {
         try {
+            BluetoothLowEnergy.setConnectionStrategy(BluetoothLowEnergy.CONNECTION_STRATEGY_SECURE_PAIR_BOND);
             BluetoothLowEnergy.setDelegate(_delegate);
             BluetoothLowEnergy.registerProfile({
                 :uuid => _serviceUuid,
@@ -460,14 +463,46 @@ class MeshBackgroundNodePoller {
         }
         stopScan();
         if (_device != null) {
-            try {
-                BluetoothLowEnergy.unpairDevice(_device as BluetoothLowEnergy.Device);
-            } catch (e) {
-                // ignore
-            }
+            releaseDevice(_device as BluetoothLowEnergy.Device);
             _device = null;
         }
         _owner.onPollComplete(_messageCount, _lastSender, _lastMessage, _lastNotificationTitle, _connectedToNode, _targetIds, _polledBatteryPercent);
+    }
+
+    //! Drops the link (and any pending connect search) before the background process exits.
+    //! Per the API docs, unpairDevice() disconnects and stops reconnect attempts, while bond
+    //! keys are stored by the system separately (getBondedDevices). Should a device ever show
+    //! the bond being removed by unpair, a flag is set and later runs leave the pairing alone.
+    private function releaseDevice(device as BluetoothLowEnergy.Device) as Void {
+        if (Storage.getValue(StorageKeys.BG_UNPAIR_DROPS_BOND) == true) {
+            System.println("Background poll: keeping pairing (unpair previously dropped the bond)");
+            return;
+        }
+        var wasBonded = false;
+        try {
+            wasBonded = device.isBonded();
+            BluetoothLowEnergy.unpairDevice(device);
+        } catch (e) {
+            System.println("Background poll: unpair notice: " + e.getErrorMessage());
+            return;
+        }
+        if (wasBonded && !hasSystemBond()) {
+            Storage.setValue(StorageKeys.BG_UNPAIR_DROPS_BOND, true);
+            System.println("Background poll: WARNING unpair removed the system bond; disabling unpair for future runs");
+        } else {
+            System.println("Background poll: link released (bonded=" + wasBonded + ")");
+        }
+    }
+
+    private function hasSystemBond() as Boolean {
+        if (!(BluetoothLowEnergy has :getBondedDevices)) {
+            return true; // Cannot verify; assume bond intact
+        }
+        try {
+            return BluetoothLowEnergy.getBondedDevices().next() != null;
+        } catch (e) {
+            return true;
+        }
     }
 }
 
