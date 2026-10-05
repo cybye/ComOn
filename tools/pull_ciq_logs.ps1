@@ -13,7 +13,8 @@ $logs = $apps.GetFolder.Items() | Where-Object { $_.Name -eq 'LOGS' }
 
 $targetDir = "tmp_logs"
 if (-not (Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
-$destFolder = $shell.Namespace($targetDir)
+$absPath = (Resolve-Path $targetDir).Path
+$destFolder = $shell.Namespace($absPath)
 
 if ($logs) {
     foreach ($lf in $logs.GetFolder.Items()) {

@@ -1,5 +1,6 @@
 import Toybox.Lang;
 
+(:background)
 module StorageKeys {
     // Cross-Process Shared Message Store
     public const CHAT_HISTORY                  as String = "cfg_chat_history";

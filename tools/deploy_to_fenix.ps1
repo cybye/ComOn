@@ -1,3 +1,8 @@
+param(
+    [switch]$AppOnly,
+    [switch]$DataFieldOnly
+)
+
 $shell = New-Object -ComObject Shell.Application
 $computer = $shell.Namespace(17) # ssfDRIVES / My Computer
 $fenix = $computer.Items() | Where-Object { $_.Name -like '*fenix*' -or $_.Name -like '*Garmin*' } | Select-Object -First 1
@@ -13,19 +18,23 @@ if ($fenix) {
                 Write-Host "Found GARMIN\Apps folder"
                 $appsFolder = $apps.GetFolder
                 
-                $dfCandidate = "bin\ComOnDataField_fenix847mm.prg"
-                if (-not (Test-Path $dfCandidate)) { $dfCandidate = "bin\ComOnDatafield.prg" }
-                $dfSource = (Resolve-Path $dfCandidate).Path
-                Write-Host "Deploying $dfSource to Apps..."
-                $appsFolder.CopyHere($dfSource, 16)
-                Write-Host "Waiting for DataField MTP transfer..."
-                Start-Sleep -Seconds 8
+                if (-not $AppOnly) {
+                    $dfCandidate = "bin\ComOnDataField_fenix847mm.prg"
+                    if (-not (Test-Path $dfCandidate)) { $dfCandidate = "bin\ComOnDatafield.prg" }
+                    $dfSource = (Resolve-Path $dfCandidate).Path
+                    Write-Host "Deploying $dfSource to Apps..."
+                    $appsFolder.CopyHere($dfSource, 16)
+                    Write-Host "Waiting for DataField MTP transfer..."
+                    Start-Sleep -Seconds 8
+                }
 
-                $appSource = (Resolve-Path "bin\ComOn.prg").Path
-                Write-Host "Deploying $appSource to Apps..."
-                $appsFolder.CopyHere($appSource, 16)
-                Write-Host "Waiting for App MTP transfer..."
-                Start-Sleep -Seconds 8
+                if (-not $DataFieldOnly) {
+                    $appSource = (Resolve-Path "bin\ComOn.prg").Path
+                    Write-Host "Deploying $appSource to Apps..."
+                    $appsFolder.CopyHere($appSource, 16)
+                    Write-Host "Waiting for App MTP transfer..."
+                    Start-Sleep -Seconds 8
+                }
                 
                 Write-Host "Deployment completed successfully!"
             } else {

@@ -332,35 +332,43 @@ class MeshCoreEngine {
     }
 
     private function handleChannelFrame(value as ByteArray) as Void {
-        var parsed = MeshFrameParser.parseBinaryChannel(value);
-        if (parsed != null) {
-            var idx = parsed[:channelIdx] as Number;
-            var name = parsed[:name] as String;
-            if (_isFullSync) {
-                ContactManager.addSyncChannel(idx, name);
-            } else {
-                ContactManager.addChannel(idx, name);
+        try {
+            var parsed = MeshFrameParser.parseBinaryChannel(value);
+            if (parsed != null) {
+                var idx = parsed[:channelIdx] as Number;
+                var name = parsed[:name] as String;
+                if (_isFullSync) {
+                    ContactManager.addSyncChannel(idx, name);
+                } else {
+                    ContactManager.addChannel(idx, name);
+                }
+                if (_onChannelsChangedCallback != null) {
+                    _onChannelsChangedCallback.invoke();
+                }
             }
-            if (_onChannelsChangedCallback != null) {
-                _onChannelsChangedCallback.invoke();
-            }
+        } catch (e) {
+            System.println("MeshCoreEngine handleChannelFrame notice: " + e.getErrorMessage());
         }
     }
 
     private function handleContactFrame(value as ByteArray) as Void {
-        var parsed = MeshFrameParser.parseBinaryContact(value);
-        if (parsed != null) {
-            var id = parsed[:id] as String;
-            var name = parsed[:name] as String;
-            var advType = parsed[:advType] as Number;
-            if (_isFullSync) {
-                ContactManager.addSyncContact(id, name, advType);
-            } else {
-                ContactManager.addContact(id, name, advType);
+        try {
+            var parsed = MeshFrameParser.parseBinaryContact(value);
+            if (parsed != null) {
+                var id = parsed[:id] as String;
+                var name = parsed[:name] as String;
+                var advType = parsed[:advType] as Number;
+                if (_isFullSync) {
+                    ContactManager.addSyncContact(id, name, advType);
+                } else {
+                    ContactManager.addContact(id, name, advType);
+                }
+                if (_onContactsChangedCallback != null) {
+                    _onContactsChangedCallback.invoke();
+                }
             }
-            if (_onContactsChangedCallback != null) {
-                _onContactsChangedCallback.invoke();
-            }
+        } catch (e) {
+            System.println("MeshCoreEngine handleContactFrame notice: " + e.getErrorMessage());
         }
     }
 

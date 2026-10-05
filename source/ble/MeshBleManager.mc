@@ -1227,31 +1227,39 @@ class MeshBleManager {
     }
 
     private function parseBinaryChannel(value as ByteArray) as Void {
-        var parsed = MeshFrameParser.parseBinaryChannel(value);
-        if (parsed != null) {
-            var chIdx = parsed[:channelIdx] as Number;
-            var nameStr = parsed[:name] as String;
-            System.println("BLE parsed channel " + chIdx + ": " + nameStr);
-            if (_isFullSync) {
-                ContactManager.addSyncChannel(chIdx, nameStr);
-            } else {
-                ContactManager.addChannel(chIdx, nameStr);
+        try {
+            var parsed = MeshFrameParser.parseBinaryChannel(value);
+            if (parsed != null) {
+                var chIdx = parsed[:channelIdx] as Number;
+                var nameStr = parsed[:name] as String;
+                System.println("BLE parsed channel " + chIdx + ": " + nameStr);
+                if (_isFullSync) {
+                    ContactManager.addSyncChannel(chIdx, nameStr);
+                } else {
+                    ContactManager.addChannel(chIdx, nameStr);
+                }
             }
+        } catch (e) {
+            System.println("BLE parseBinaryChannel notice: " + e.getErrorMessage());
         }
     }
 
     private function parseBinaryContact(value as ByteArray) as Void {
-        var parsed = MeshFrameParser.parseBinaryContact(value);
-        if (parsed != null) {
-            var id = parsed[:id] as String;
-            var nameStr = parsed[:name] as String;
-            var advType = parsed[:advType] as Number;
-            System.println("BLE parsed contact: id=" + id + " name=" + nameStr + " advType=" + advType);
-            if (_isFullSync) {
-                ContactManager.addSyncContact(id, nameStr, advType);
-            } else {
-                ContactManager.addContact(id, nameStr, advType);
+        try {
+            var parsed = MeshFrameParser.parseBinaryContact(value);
+            if (parsed != null) {
+                var id = parsed[:id] as String;
+                var nameStr = parsed[:name] as String;
+                var advType = parsed[:advType] as Number;
+                System.println("BLE parsed contact: id=" + id + " name=" + nameStr + " advType=" + advType);
+                if (_isFullSync) {
+                    ContactManager.addSyncContact(id, nameStr, advType);
+                } else {
+                    ContactManager.addContact(id, nameStr, advType);
+                }
             }
+        } catch (e) {
+            System.println("BLE parseBinaryContact notice: " + e.getErrorMessage());
         }
     }
 

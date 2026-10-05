@@ -2,6 +2,7 @@ import Toybox.Lang;
 import Toybox.StringUtil;
 import Toybox.System;
 
+(:background)
 module MeshFrameParser {
     // Shared Protocol Command Codes
     public const CMD_SYNC_NEXT_MESSAGE       as Number = 10;
@@ -78,6 +79,32 @@ module MeshFrameParser {
         };
     }
 
+    //! Safely decode UTF-8 byte array to String with graceful fallback to printable ASCII or null
+    public function safeUtf8(bytes as Array<Number> or ByteArray or Null) as String? {
+        if (bytes == null || bytes.size() == 0) {
+            return null;
+        }
+        try {
+            return StringUtil.utf8ArrayToString(bytes);
+        } catch (e) {
+            try {
+                var asciiChars = [] as Array<Char>;
+                for (var i = 0; i < bytes.size(); i++) {
+                    var b = bytes[i] as Number;
+                    if (b >= 32 && b <= 126) {
+                        asciiChars.add(b.toChar());
+                    }
+                }
+                if (asciiChars.size() > 0) {
+                    return StringUtil.charArrayToString(asciiChars);
+                }
+            } catch (ex) {
+                // Ignore fallback exception
+            }
+            return null;
+        }
+    }
+
     //! Safely decode UTF-8 bytes to String
     public function decodeText(value as ByteArray, offset as Number) as String? {
         if (value == null || offset >= value.size()) {
@@ -87,12 +114,7 @@ module MeshFrameParser {
         for (var index = offset; index < value.size(); index++) {
             textBytes.add(value[index]);
         }
-        try {
-            return StringUtil.utf8ArrayToString(textBytes);
-        } catch (e) {
-            System.println("MeshFrameParser: invalid UTF-8 text");
-            return null;
-        }
+        return safeUtf8(textBytes);
     }
 
     //! Parse incoming channel message (v1: code=8, v3: code=17)
@@ -195,7 +217,7 @@ module MeshFrameParser {
         for (var i = 2; i < 34 && i < value.size() && value[i] != 0; i++) {
             nameBytes.add(value[i]);
         }
-        var nameStr = StringUtil.utf8ArrayToString(nameBytes);
+        var nameStr = safeUtf8(nameBytes);
         if (nameStr == null || nameStr.length() == 0) {
             if (chIdx == 0) {
                 nameStr = "public";
@@ -227,7 +249,7 @@ module MeshFrameParser {
             for (var n = 100; n < 132 && n < value.size() && value[n] != 0; n++) {
                 nameBytes.add(value[n]);
             }
-            var nameStr = StringUtil.utf8ArrayToString(nameBytes);
+            var nameStr = safeUtf8(nameBytes);
             if (nameStr == null || nameStr.length() == 0) {
                 nameStr = "Node " + idHex;
             }
@@ -238,23 +260,28 @@ module MeshFrameParser {
             };
         } else if (value.size() >= 4) {
             // Compact / Simulator format: [3, idLen, idBytes..., nameLen, nameBytes...]
+            // Only process if packet strictly matches the simulated envelope structure
             var idLen = value[1] as Number;
-            if (value.size() >= 2 + idLen + 1) {
-                var idBytes = [] as Array<Number>;
-                for (var i = 2; i < 2 + idLen; i++) { idBytes.add(value[i]); }
-                var idStr = StringUtil.utf8ArrayToString(idBytes);
-
-                var nameLenIdx = 2 + idLen;
+            var nameLenIdx = 2 + idLen;
+            if (idLen > 0 && idLen < 32 && value.size() > nameLenIdx) {
                 var nameLen = value[nameLenIdx] as Number;
-                if (value.size() >= nameLenIdx + 1 + nameLen) {
+                var totalExpected = nameLenIdx + 1 + nameLen;
+                if (nameLen >= 0 && nameLen < 64 && value.size() == totalExpected) {
+                    var idBytes = [] as Array<Number>;
+                    for (var i = 2; i < 2 + idLen; i++) { idBytes.add(value[i]); }
+                    var idStr = safeUtf8(idBytes);
+
                     var nameBytes2 = [] as Array<Number>;
-                    for (var j = nameLenIdx + 1; j < nameLenIdx + 1 + nameLen; j++) { nameBytes2.add(value[j]); }
-                    var nameStr2 = StringUtil.utf8ArrayToString(nameBytes2);
-                    return {
-                        :id => idStr,
-                        :name => nameStr2,
-                        :advType => 1
-                    };
+                    for (var j = nameLenIdx + 1; j < totalExpected; j++) { nameBytes2.add(value[j]); }
+                    var nameStr2 = safeUtf8(nameBytes2);
+
+                    if (idStr != null && idStr.length() > 0) {
+                        return {
+                            :id => idStr,
+                            :name => (nameStr2 != null && nameStr2.length() > 0) ? nameStr2 : ("Node " + idStr),
+                            :advType => 1
+                        };
+                    }
                 }
             }
         }

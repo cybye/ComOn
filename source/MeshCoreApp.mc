@@ -10,10 +10,8 @@ import Toybox.Sensor;
 
 (:background)
 class MeshCoreApp extends Application.AppBase {
-    private static const STORAGE_FOREGROUND_ACTIVE as String = "cfg_foreground_active";
     private var _bleManager as MeshBleManager? = null;
     private var _bleDelegate as MeshBleDelegate? = null;
-    private var _isForeground as Boolean = false;
     private var _launchAction as String? = null;
     private var _heartbeatTimer as SoftTimer? = null;
 
@@ -24,9 +22,6 @@ class MeshCoreApp extends Application.AppBase {
 
     (:background)
     function onStart(state as Dictionary?) as Void {
-        _isForeground = true;
-        Storage.setValue(StorageKeys.FOREGROUND_ACTIVE, true);
-        Storage.setValue(StorageKeys.FOREGROUND_ACTIVE_AT, Time.now().value());
         if (state != null && state.hasKey(:launchedFromNotification)) {
             var action = state.get(:launchedFromNotification);
             if (action instanceof String) {
@@ -83,10 +78,8 @@ class MeshCoreApp extends Application.AppBase {
             _heartbeatTimer.stop();
             _heartbeatTimer = null;
         }
-        if (_isForeground) {
-            Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE);
-            Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE_AT);
-        }
+        Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE);
+        Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE_AT);
         if (!(Toybox has :WatchUi) || _bleManager == null) {
             return;
         }
@@ -131,7 +124,6 @@ class MeshCoreApp extends Application.AppBase {
     }
 
     function getInitialView() as [Views] or [Views, InputDelegates] {
-        _isForeground = true;
         Storage.setValue(StorageKeys.FOREGROUND_ACTIVE, true);
         onForegroundHeartbeat();
         if (_heartbeatTimer == null) {
