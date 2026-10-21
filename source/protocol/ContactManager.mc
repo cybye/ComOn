@@ -406,7 +406,9 @@ class ContactManager {
 
     public static function setLastContactSyncTime(t as Number) as Void {
         _lastContactSyncTime = t;
-        saveToStorage();
+        if (!_inFullSync) {
+            saveToStorage();
+        }
     }
 
     public static function getChannels() as Array<Dictionary> {

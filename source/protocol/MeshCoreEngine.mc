@@ -75,9 +75,21 @@ class MeshCoreEngine {
         _onSyncCompleteCallback = callback;
     }
 
-    private function notifyStatusChanged() as Void {
+    public function notifyStatusChanged() as Void {
         if (_onStatusChangedCallback != null) {
             _onStatusChangedCallback.invoke(isConnected, nodeBatteryPercent, loraRssi, loraSnr);
+        }
+    }
+
+    public function notifyChannelsChanged() as Void {
+        if (_onChannelsChangedCallback != null) {
+            _onChannelsChangedCallback.invoke();
+        }
+    }
+
+    public function notifyContactsChanged() as Void {
+        if (_onContactsChangedCallback != null) {
+            _onContactsChangedCallback.invoke();
         }
     }
 
@@ -263,9 +275,18 @@ class MeshCoreEngine {
             sendRaw(MeshProtocol.encodeSyncNextMessage());
             return;
         }
+        if (_syncStage == 6 && firstByte == MeshFrameParser.RESP_CODE_CHANNEL_DATA_RECV) {
+            var parsedData = MeshFrameParser.parseChannelData(value);
+            if (parsedData != null && parsedData.hasKey(:snr)) {
+                loraSnr = parsedData[:snr] as Number;
+                notifyStatusChanged();
+            }
+            sendRaw(MeshProtocol.encodeSyncNextMessage());
+            return;
+        }
 
         // 9. Stage 6: Message inbox complete
-        if (_syncStage == 6 && (firstByte == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES || firstByte == MeshFrameParser.RESP_CODE_ERR)) {
+        if (_syncStage == 6 && ((firstByte == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES && value.size() == 1) || (firstByte == MeshFrameParser.RESP_CODE_ERR && value.size() <= 2))) {
             finishSync();
             return;
         }
@@ -281,7 +302,16 @@ class MeshCoreEngine {
             }
             return;
         }
-        if (_isInboxPolling && (firstByte == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES || firstByte == MeshFrameParser.RESP_CODE_ERR)) {
+        if (_isInboxPolling && firstByte == MeshFrameParser.RESP_CODE_CHANNEL_DATA_RECV) {
+            var parsedPollData = MeshFrameParser.parseChannelData(value);
+            if (parsedPollData != null && parsedPollData.hasKey(:snr)) {
+                loraSnr = parsedPollData[:snr] as Number;
+                notifyStatusChanged();
+            }
+            sendRaw(MeshProtocol.encodeSyncNextMessage());
+            return;
+        }
+        if (_isInboxPolling && ((firstByte == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES && value.size() == 1) || (firstByte == MeshFrameParser.RESP_CODE_ERR && value.size() <= 2))) {
             _isInboxPolling = false;
             return;
         }

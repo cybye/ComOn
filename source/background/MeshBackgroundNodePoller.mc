@@ -11,8 +11,9 @@ import Toybox.Time;
 class MeshBackgroundNodePoller {
     // Overall budget per run. Only enforced reactively on BLE callbacks (Toybox.Timer is not
     // available in background); the system's 30 s background limit is the final backstop.
-    private static const POLL_TIMEOUT_MS as Number = 18000;
+    private static const POLL_TIMEOUT_MS as Number = 25000;
     private static const MAX_BACKGROUND_MESSAGES as Number = 10;
+    private static const MAX_SKIPPED_DATAGRAMS as Number = 20;
     private static const BATTERY_POLL_INTERVAL_SECS as Number = 3600;
 
     private var _owner as MeshBackgroundDelegate;
@@ -31,10 +32,13 @@ class MeshBackgroundNodePoller {
     private var _awaitingBattery as Boolean = false;
     private var _polledBatteryPercent as Number? = null;
     private var _messageCount as Number = 0;
+    private var _skippedDatagramCount as Number = 0;
     private var _lastSender as String? = null;
     private var _lastMessage as String? = null;
     private var _lastNotificationTitle as String? = null;
     private var _targetIds as Array<String> = [] as Array<String>;
+    private var _charWriteInProgress as Boolean = false;
+    private var _pendingInboxRequest as Boolean = false;
 
     function initialize(owner as MeshBackgroundDelegate) {
         _owner = owner;
@@ -200,10 +204,18 @@ class MeshBackgroundNodePoller {
             finish();
             return;
         }
+        if (_connectedToNode) {
+            // CCCD may be written twice (on connect and after encryption); start sync only once
+            return;
+        }
+        System.println("Background poll: notifications enabled");
         _connectedToNode = true;
         // Grant a clean 10-second budget specifically for data exchange,
         // so that slow scan/connection/encryption handshakes don't starve message reception.
-        _deadlineAt = Time.now().value() + 10;
+        var exchangeDeadline = Time.now().value() + 10;
+        if (exchangeDeadline > _deadlineAt) {
+            _deadlineAt = exchangeDeadline;
+        }
         startDataSync();
     }
 
@@ -230,9 +242,11 @@ class MeshBackgroundNodePoller {
         }
         _awaitingBattery = true;
         try {
+            _charWriteInProgress = true;
             _rxCharacteristic.requestWrite([MeshFrameParser.CMD_GET_BATTERY_AND_STORAGE]b, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
             System.println("Background poll: requested node battery");
         } catch (e) {
+            _charWriteInProgress = false;
             System.println("Background poll: battery request failed: " + e.getErrorMessage());
             _awaitingBattery = false;
             requestNextMessage();
@@ -240,9 +254,18 @@ class MeshBackgroundNodePoller {
     }
 
     public function onCharacteristicWrite(characteristic as BluetoothLowEnergy.Characteristic, status as BluetoothLowEnergy.Status) as Void {
-        if (!_finished && status != BluetoothLowEnergy.STATUS_SUCCESS) {
-            System.println("Background poll: inbox request write failed: " + status);
+        _charWriteInProgress = false;
+        if (_finished) {
+            return;
+        }
+        if (status != BluetoothLowEnergy.STATUS_SUCCESS) {
+            System.println("Background poll: request write failed: " + status);
             finish();
+            return;
+        }
+        if (_pendingInboxRequest) {
+            _pendingInboxRequest = false;
+            requestNextMessage();
         }
     }
 
@@ -259,6 +282,7 @@ class MeshBackgroundNodePoller {
                         var cccd = txChar.getDescriptor(BluetoothLowEnergy.cccdUuid());
                         if (cccd != null && (cccd has :requestWrite)) {
                             cccd.requestWrite([0x01, 0x00]b);
+                            System.println("Background poll: requested CCCD write post-encryption");
                         }
                     }
                 } catch (e) {
@@ -276,23 +300,47 @@ class MeshBackgroundNodePoller {
             finish();
             return;
         }
+        if (_charWriteInProgress) {
+            // Previous write not yet acknowledged; issue from onCharacteristicWrite
+            _pendingInboxRequest = true;
+            return;
+        }
         if (expired()) {
             System.println("Background poll: deadline reached during inbox sync");
             finish();
             return;
         }
         try {
+            _charWriteInProgress = true;
             _rxCharacteristic.requestWrite([MeshFrameParser.CMD_SYNC_NEXT_MESSAGE]b, { :writeType => BluetoothLowEnergy.WRITE_TYPE_DEFAULT });
         } catch (e) {
+            _charWriteInProgress = false;
             System.println("Background poll: inbox request failed: " + e.getErrorMessage());
             finish();
         }
+    }
+
+    private function formatBytes(bytes as ByteArray) as String {
+        var hex = "";
+        var ascii = "";
+        var limit = bytes.size() > 20 ? 20 : bytes.size();
+        for (var i = 0; i < limit; i++) {
+            var b = bytes[i] as Number;
+            hex += b.format("%02X") + " ";
+            if (b >= 32 && b <= 126) {
+                ascii += (b.toChar()).toString();
+            } else {
+                ascii += ".";
+            }
+        }
+        return hex + "| " + ascii;
     }
 
     public function onCharacteristicChanged(characteristic as BluetoothLowEnergy.Characteristic, value as ByteArray) as Void {
         if (_finished || value == null || value.size() == 0) {
             return;
         }
+        System.println("Background poll: RX (" + value.size() + "B): " + formatBytes(value));
         if (expired()) {
             System.println("Background poll: deadline reached while receiving data");
             finish();
@@ -301,56 +349,34 @@ class MeshBackgroundNodePoller {
 
         var firstByte = value[0] as Number;
 
-        // If we are currently collecting chunks of a fragmented message:
+        // If we are currently collecting chunks of a fragmented packet:
         if (_fragmentBuffer != null) {
-            // Only a true protocol boundary terminates an in-flight fragment:
-            // - RESP_CODE_NO_MORE_MESSAGES (10): inbox drained
-            // - RESP_CODE_ERR (1): node returned an error
-            // - A new message header starting a subsequent message
-            // Note: Raw continuation data bytes (e.g. umlauts, \n, emojis >= 0x80)
-            // must NOT trigger finishFragment().
-            var isBoundary = (firstByte == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES) ||
-                             (firstByte == MeshFrameParser.RESP_CODE_ERR) ||
-                             (MeshFrameParser.isMessageFrame(firstByte) && isNewMessageHeader(value));
-
-            if (isBoundary) {
+            // 1. Detect nRF52 BLE UART partial-write retry (re-sent from byte 0)
+            if (MeshFrameParser.isFragmentRetry(_fragmentBuffer, value)) {
+                _fragmentBuffer = []b;
+                (_fragmentBuffer as ByteArray).addAll(value);
+                return;
+            }
+            // 2. Only a true protocol boundary terminates an in-flight fragment
+            if (MeshFrameParser.isFrameBoundary(_fragmentBuffer, value)) {
                 finishFragment();
             } else {
                 (_fragmentBuffer as ByteArray).addAll(value);
-                if (value.size() < 20) {
+                if (value.size() < 20 || MeshFrameParser.isCompleteKnownSizeFrame(_fragmentBuffer)) {
                     finishFragment();
                 }
                 return;
             }
         }
 
-        // Start new fragment buffer if this is a 20-byte message frame
-        if (value.size() == 20 && MeshFrameParser.isMessageFrame(firstByte)) {
+        // Start new fragment buffer if this is a 20-byte fragmentable frame not yet complete at 20B
+        if (value.size() == 20 && MeshFrameParser.isFragmentablePacket(firstByte) && !MeshFrameParser.isCompleteKnownSizeFrame(value)) {
             _fragmentBuffer = []b;
             (_fragmentBuffer as ByteArray).addAll(value);
             return;
         }
 
         processFrame(value);
-    }
-
-    //! Distinguishes an actual new message frame header from continuation text.
-    //! Channel message v1: header is at least 8 bytes, v3: at least 11 bytes.
-    //! Contact message v1: header is at least 13 bytes, v3: at least 16 bytes.
-    private function isNewMessageHeader(chunk as ByteArray) as Boolean {
-        if (chunk.size() < 12) {
-            return false;
-        }
-        var code = chunk[0] as Number;
-        if (code == MeshFrameParser.RESP_CODE_CHANNEL_MSG || code == MeshFrameParser.RESP_CODE_CHANNEL_MSG_V3) {
-            var parsed = MeshFrameParser.parseChannelMessage(chunk);
-            return parsed != null && parsed.hasKey(:text);
-        }
-        if (code == MeshFrameParser.RESP_CODE_CONTACT_MSG || code == MeshFrameParser.RESP_CODE_CONTACT_MSG_V3) {
-            var parsed = MeshFrameParser.parseDirectMessage(chunk);
-            return parsed != null && parsed.hasKey(:text);
-        }
-        return false;
     }
 
     private function finishFragment() as Void {
@@ -374,7 +400,8 @@ class MeshBackgroundNodePoller {
             return;
         }
 
-        if (code == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES || code == MeshFrameParser.RESP_CODE_ERR) {
+        if ((code == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES && value.size() == 1) ||
+            (code == MeshFrameParser.RESP_CODE_ERR && value.size() <= 2)) {
             finish();
             return;
         }
@@ -388,6 +415,17 @@ class MeshBackgroundNodePoller {
             requestFollowingMessage();
             return;
         }
+        if (code == MeshFrameParser.RESP_CODE_CHANNEL_DATA_RECV) {
+            // Binary channel datagram (e.g. position/telemetry report) - not a chat message,
+            // but queued in the node's FIFO offline sync buffer, so continue draining.
+            _skippedDatagramCount += 1;
+            if (_skippedDatagramCount <= MAX_SKIPPED_DATAGRAMS) {
+                requestNextMessage();
+            } else {
+                finish();
+            }
+            return;
+        }
         if (code == MeshFrameParser.PUSH_CODE_MSG_WAITING) {
             requestNextMessage();
             return;
@@ -398,8 +436,6 @@ class MeshBackgroundNodePoller {
             return;
         }
         System.println("Background poll: ignoring unknown frame code " + code);
-        // Do not finish() on unknown frame codes; request next message to keep sync moving
-        requestNextMessage();
     }
 
     private function requestFollowingMessage() as Void {
@@ -466,6 +502,9 @@ class MeshBackgroundNodePoller {
     }
 
     private function storeMessage(targetId as String, sender as String, text as String, notificationTitle as String) as Void {
+        if (text == null || text.length() == 0 || (sender.equals("Mesh") && text.length() < 2)) {
+            return;
+        }
         MeshBackgroundInboxStore.addIncomingMessage(targetId, sender, text);
         _messageCount += 1;
         _lastSender = sender;

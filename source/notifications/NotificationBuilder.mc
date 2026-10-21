@@ -34,12 +34,11 @@ module NotificationBuilder {
         return { :base => actionString, :targetId => null };
     }
 
-    //! Build standard notification action array for a single target
-    public function buildTargetActions(targetId as String, openChatLabel as String, replyLabel as String, posLabel as String, okLabel as String) as Array<Notifications.Action> {
+    //! Build standard notification action array for a single target (Reply is primary at index 0, capped to 3 for Garmin OS compatibility)
+    public function buildTargetActions(targetId as String, replyLabel as String, openChatLabel as String, okLabel as String) as Array<Notifications.Action> {
         var actions = [] as Array<Notifications.Action>;
-        actions.add({ :label => openChatLabel, :data => makeActionData(ACTION_CHAT, targetId) });
         actions.add({ :label => replyLabel,    :data => makeActionData(ACTION_REPLY, targetId) });
-        actions.add({ :label => posLabel,      :data => makeActionData(ACTION_SEND_POS, targetId) });
+        actions.add({ :label => openChatLabel, :data => makeActionData(ACTION_CHAT, targetId) });
         actions.add({ :label => okLabel,       :data => makeActionData(ACTION_SEND_OK, targetId) });
         return actions;
     }

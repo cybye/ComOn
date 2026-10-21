@@ -130,7 +130,11 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
             Storage.deleteValue(StorageKeys.BG_NODE_UNAVAILABLE_NOTIFIED);
         } else if (Storage.getValue(StorageKeys.BG_NODE_UNAVAILABLE_NOTIFIED) != true) {
             try {
-                Notifications.showNotification("ComOn", "Node unavailable", { :body => "Background check could not connect to the node.", :dismissPrevious => true });
+                Notifications.showNotification("ComOn", "Node unavailable", {
+                    :body => "Background check could not connect to the node.",
+                    :dismissPrevious => true,
+                    :actions => [ { :label => "OK", :data => "DISMISS" } ]
+                });
                 Storage.setValue(StorageKeys.BG_NODE_UNAVAILABLE_NOTIFIED, true);
                 System.println("MeshBackgroundDelegate: posted node-unavailable notification");
             } catch (e) {
@@ -142,7 +146,11 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
             if (pct <= 15) {
                 if (Storage.getValue(StorageKeys.BG_LOW_BATTERY_NOTIFIED) != true) {
                     try {
-                        Notifications.showNotification("ComOn", "Node Battery low", { :body => "MeshCore Node battery low at " + pct + "%", :dismissPrevious => false });
+                        Notifications.showNotification("ComOn", "Node Battery low", {
+                            :body => "MeshCore Node battery low at " + pct + "%",
+                            :dismissPrevious => false,
+                            :actions => [ { :label => "OK", :data => "DISMISS" } ]
+                        });
                         Storage.setValue(StorageKeys.BG_LOW_BATTERY_NOTIFIED, true);
                         System.println("MeshBackgroundDelegate: posted low-battery notification (" + pct + "%)");
                     } catch (e) {
@@ -163,20 +171,15 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
                     }
                     body = Lang.format(batchTemplate as String, [ messageCount.format("%d") ]) + "\n" + body;
                 }
+                var activeTargetId = (targetIds.size() > 0) ? targetIds[targetIds.size() - 1] : "CH_0";
+                var primaryData = NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, activeTargetId);
                 var actions = [] as Array<Notifications.Action>;
-                var primaryData = NotificationBuilder.ACTION_LIST;
-                if (targetIds.size() == 1) {
-                    primaryData = NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, targetIds[0]);
-                    actions = NotificationBuilder.buildTargetActions(
-                        targetIds[0],
-                        storedLabel(StorageKeys.NOTIF_OPEN_CHAT, "Open Chat"),
-                        storedLabel(StorageKeys.NOTIF_REPLY, "Reply"),
-                        storedLabel(StorageKeys.NOTIF_POSITION, "Position"),
-                        storedLabel(StorageKeys.NOTIF_OK, "OK")
-                    );
+                actions.add({ :label => storedLabel(StorageKeys.NOTIF_REPLY, "Reply"), :data => NotificationBuilder.makeActionData(NotificationBuilder.ACTION_REPLY, activeTargetId) });
+                actions.add({ :label => storedLabel(StorageKeys.NOTIF_OPEN_CHAT, "Open Chat"), :data => NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, activeTargetId) });
+                if (targetIds.size() > 1) {
+                    actions.add({ :label => storedLabel(StorageKeys.NOTIF_OPEN_CHATS, "Open Chats"), :data => NotificationBuilder.ACTION_LIST });
                 } else {
-                    var openChatsLabel = storedLabel(StorageKeys.NOTIF_OPEN_CHATS, "Open Chats");
-                    actions.add({ :label => openChatsLabel, :data => NotificationBuilder.ACTION_LIST });
+                    actions.add({ :label => storedLabel(StorageKeys.NOTIF_OK, "OK"), :data => NotificationBuilder.makeActionData(NotificationBuilder.ACTION_SEND_OK, activeTargetId) });
                 }
                 var notificationTitle = (lastNotificationTitle != null) ? lastNotificationTitle : ("Mesh: " + lastSender);
                 var subTitle = storedLabel(StorageKeys.NOTIF_INCOMING_MSG, "Incoming message");
@@ -186,6 +189,7 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
                     :dismissPrevious => true,
                     :actions => actions
                 });
+                System.println("MeshBackgroundDelegate: posted message notification (" + messageCount + " msgs)");
             } catch (e) {
                 System.println("MeshBackgroundDelegate: notification failed: " + e.getErrorMessage());
             }

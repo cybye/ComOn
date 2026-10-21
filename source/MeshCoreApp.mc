@@ -78,9 +78,14 @@ class MeshCoreApp extends Application.AppBase {
             _heartbeatTimer.stop();
             _heartbeatTimer = null;
         }
+        // Only the foreground UI instance owns FOREGROUND_ACTIVE; a background
+        // process exit must not clear the flag while the app UI is still open.
+        if (!(Toybox has :WatchUi)) {
+            return;
+        }
         Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE);
         Storage.deleteValue(StorageKeys.FOREGROUND_ACTIVE_AT);
-        if (!(Toybox has :WatchUi) || _bleManager == null) {
+        if (_bleManager == null) {
             return;
         }
 

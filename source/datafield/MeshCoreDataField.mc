@@ -11,6 +11,8 @@ class MeshCoreDataField extends WatchUi.DataField {
     private var _snrField as FitContributor.Field?;
     private var _peersField as FitContributor.Field?;
     private var _batField as FitContributor.Field?;
+    private var _nodeNameField as FitContributor.Field?;
+    private var _nodeNameRecorded as Boolean = false;
 
     private var _fitLoggingEnabled as Boolean = true;
     private var _dbgFitStatus as String = "FIT: init";
@@ -39,15 +41,11 @@ class MeshCoreDataField extends WatchUi.DataField {
                 _snrField  = createField("lora_snr", 1, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "dB" });
                 _peersField = createField("mesh_nodes", 2, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "nodes" });
                 _batField  = createField("mesh_bat", 3, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "%" });
-
-                if (_rssiField != null) { _rssiField.setData(0.0); }
-                if (_snrField != null)  { _snrField.setData(0.0); }
-                if (_peersField != null) { _peersField.setData(0.0); }
-                if (_batField != null)  { _batField.setData(0.0); }
+                _nodeNameField = createField("node_name", 4, FitContributor.DATA_TYPE_STRING, { :mesgType => FitContributor.MESG_TYPE_SESSION, :count => 32 });
 
                 _dbgFitStatus = "FIT: OK";
                 Storage.setValue("dbg_fit_init", "ok");
-                System.println("MeshCoreDataField: FitContributor fields initialized successfully (4 record float)");
+                System.println("MeshCoreDataField: FitContributor fields initialized successfully (4 record float, 1 session str)");
             } catch (e) {
                 _dbgFitStatus = "FIT Err: " + e.getErrorMessage();
                 Storage.setValue("dbg_fit_init", "err: " + e.getErrorMessage());
@@ -64,17 +62,6 @@ class MeshCoreDataField extends WatchUi.DataField {
         System.println("MeshCoreDataField: onTimerStart() event received from OS");
         _timerState = 1;
         TelemetryDispatcher.getInstance().triggerImmediateBeacon();
-        if (_fitLoggingEnabled) {
-            try {
-                if (_rssiField != null) { _rssiField.setData(0.0); }
-                if (_snrField != null)  { _snrField.setData(0.0); }
-                if (_peersField != null) { _peersField.setData(0.0); }
-                if (_batField != null)  { _batField.setData(0.0); }
-                System.println("MeshCoreDataField: onTimerStart wrote initial zero seed data to FIT fields");
-            } catch (e) {
-                System.println("MeshCoreDataField: onTimerStart setData exception: " + e.getErrorMessage());
-            }
-        }
     }
 
     public function onTimerStop() as Void {
@@ -99,6 +86,9 @@ class MeshCoreDataField extends WatchUi.DataField {
 
     //! Periodic execution (1 Hz) during activity recording
     function compute(info as Activity.Info) as Void {
+        var bleMgr = getDataFieldBleManager();
+        bleMgr.tickDataField();
+
         if (info != null && (info has :timerState) && info.timerState != null) {
             if (info.timerState == Activity.TIMER_STATE_ON) {
                 _timerState = 1;
@@ -108,8 +98,6 @@ class MeshCoreDataField extends WatchUi.DataField {
                 _timerState = 0;
             }
         }
-
-        var bleMgr = getDataFieldBleManager();
 
         _reconnectTick++;
         if (!bleMgr.isConnected && !bleMgr.isScanning && (_reconnectTick % 5 == 0)) {
@@ -121,6 +109,20 @@ class MeshCoreDataField extends WatchUi.DataField {
             bleMgr.requestNodeBattery();
         }
 
+        // Record node name once per session into Session MESG
+        if (_fitLoggingEnabled && !_nodeNameRecorded && bleMgr.isConnected && _nodeNameField != null) {
+            var dName = bleMgr.deviceName;
+            if (dName != null && dName.length() > 0 && !dName.equals("Mesh Node")) {
+                try {
+                    _nodeNameField.setData(dName);
+                    _nodeNameRecorded = true;
+                    System.println("MeshCoreDataField: node_name recorded to FIT session: " + dName);
+                } catch (e) {
+                    System.println("MeshCoreDataField: node_name setData err: " + e.getErrorMessage());
+                }
+            }
+        }
+
         // 1. Update Telemetry Collector
         var agg = TelemetryAggregator.getInstance();
         agg.updateFromActivity(info);
@@ -130,33 +132,31 @@ class MeshCoreDataField extends WatchUi.DataField {
         disp.tick(bleMgr);
 
         // 3. Update FitContributor Records (Wardriving)
-        if (_fitLoggingEnabled) {
-            var isConn = bleMgr.isConnected;
-            var rssi = isConn ? bleMgr.loraRssi : null;
-            var snr = isConn ? bleMgr.loraSnr : null;
-            var peers = isConn ? bleMgr.peerCount : 0;
-            var bat = isConn ? bleMgr.nodeBatteryPercent : null;
+        // Strict Fail-Fast: Only set data when live node metrics exist. Do NOT write fake 0.0 values.
+        if (_fitLoggingEnabled && bleMgr.isConnected) {
+            var rssi = bleMgr.loraRssi;
+            var snr = bleMgr.loraSnr;
+            var peers = bleMgr.peerCount;
+            var bat = bleMgr.nodeBatteryPercent;
 
             try {
-                if (_rssiField != null) {
-                    _rssiField.setData((rssi != null) ? (rssi as Number).toFloat() : 0.0);
+                if (_rssiField != null && rssi != null) {
+                    _rssiField.setData((rssi as Number).toFloat());
                 }
-                if (_snrField != null) {
-                    _snrField.setData((snr != null) ? (snr as Number).toFloat() : 0.0);
+                if (_snrField != null && snr != null) {
+                    _snrField.setData((snr as Number).toFloat());
                 }
-                if (_peersField != null) {
+                if (_peersField != null && peers > 0) {
                     _peersField.setData((peers as Number).toFloat());
                 }
-                if (_batField != null) {
-                    _batField.setData((bat != null) ? (bat as Number).toFloat() : 0.0);
+                if (_batField != null && bat != null) {
+                    _batField.setData((bat as Number).toFloat());
                 }
             } catch (e) {
                 System.println("MeshCoreDataField: setData exception: " + e.getErrorMessage());
             }
 
-            if (isConn) {
-                _dataPointsCaptured++;
-            }
+            _dataPointsCaptured++;
         }
 
         if (_dataPointsCaptured % 10 == 0) {

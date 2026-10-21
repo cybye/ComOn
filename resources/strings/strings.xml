@@ -177,6 +177,9 @@
     <string id="FitBatChart">Node Bat</string>
     <string id="FitBatLabel">Node Bat</string>
     <string id="FitBatUnit">%</string>
+    <string id="FitNodeNameChart">Mesh Node</string>
+    <string id="FitNodeNameLabel">Node</string>
+    <string id="FitNodeNameUnit"> </string>
 
     <!-- SOS View -->
     <string id="SosHeader">SOS EMERGENCY</string>

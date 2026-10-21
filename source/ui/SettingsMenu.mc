@@ -23,18 +23,6 @@ class SettingsMenu extends WatchUi.Menu2 {
         var quietOn = Storage.getValue(StorageKeys.BG_QUIET_MODE) != false;
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingBgQuiet), quietOn ? I18n.get(Rez.Strings.SettingActiveOn) : I18n.get(Rez.Strings.SettingInactiveOff), "SET_BG_QUIET", null));
 
-        // Wardriving FIT Logging (defensive)
-        var fitLog = true;
-        try {
-            var rawFit = Storage.getValue("fitLoggingEnabled");
-            if (rawFit != null && (rawFit instanceof Boolean)) {
-                fitLog = rawFit;
-            }
-        } catch (e) {
-            System.println("SettingsMenu: error reading fitLoggingEnabled");
-        }
-        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingWardriving), (fitLog == true) ? I18n.get(Rez.Strings.SettingActiveOn) : I18n.get(Rez.Strings.SettingInactiveOff), "SET_WARDRIVING", null));
-
         // Telemetry format (defensive)
         var telFmt = 0;
         try {
@@ -113,13 +101,6 @@ class SettingsDelegate extends WatchUi.Menu2InputDelegate {
             var nextQuiet = !(Storage.getValue(StorageKeys.BG_QUIET_MODE) != false);
             Storage.setValue(StorageKeys.BG_QUIET_MODE, nextQuiet);
             item.setSubLabel(nextQuiet ? I18n.get(Rez.Strings.SettingActiveOn) : I18n.get(Rez.Strings.SettingInactiveOff));
-            WatchUi.requestUpdate();
-        } else if (id.equals("SET_WARDRIVING")) {
-            var enabled = Storage.getValue("fitLoggingEnabled");
-            if (!(enabled instanceof Boolean)) { enabled = true; }
-            var nextEnabled = !(enabled as Boolean);
-            Storage.setValue("fitLoggingEnabled", nextEnabled);
-            item.setSubLabel(nextEnabled ? I18n.get(Rez.Strings.SettingActiveOn) : I18n.get(Rez.Strings.SettingInactiveOff));
             WatchUi.requestUpdate();
         } else if (id.equals("SET_TEL_FORMAT")) {
             var format = Storage.getValue("telemetryFormat");

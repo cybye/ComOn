@@ -57,20 +57,18 @@ function getDataFieldBleManager() as MeshBleManager {
     return (Application.getApp() as MeshCoreDataFieldApp).getBleManager();
 }
 
-//! On-Device Settings Menu for Data Field: Channel and Contact Selection
+//! On-Device Settings Menu for Data Field: Channel Selection & FIT Logging
 class DataFieldSettingsMenu extends WatchUi.Menu2 {
     function initialize() {
         Menu2.initialize({ :title => I18n.get(Rez.Strings.DataFieldMenuTitle) });
 
         var activeBadge = I18n.get(Rez.Strings.ActiveBadge);
-        var simEnabled = Storage.getValue("sim_virtualNodeEnabled") == true;
-        var simSub = I18n.get(simEnabled ? Rez.Strings.SettingEnabled : Rez.Strings.SettingDisabled);
-        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.DfMenuSimulator), simSub, "SIM_TOGGLE", null));
 
+        // 1. LoRa Beacon Target: Disable TX
         var hasTarget = ContactManager.hasActivityTelemetryTarget();
         addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.DfMenuTxOff), !hasTarget ? activeBadge : null, "TARGET_NONE", null));
 
-        // Channels from unified ContactManager
+        // 2. Channels from ContactManager
         var channels = ContactManager.getChannels();
         for (var i = 0; i < channels.size(); i++) {
             var ch = channels[i];
@@ -79,24 +77,15 @@ class DataFieldSettingsMenu extends WatchUi.Menu2 {
             addItem(new WatchUi.MenuItem(label, isSel ? activeBadge : null, "CH_" + ch[:idx], null));
         }
 
-        // Dynamic mesh contacts (Client nodes only, max 40)
-        var contacts = ContactManager.getClientContacts();
-        var maxCt = 40;
-        var totalCt = contacts.size();
-        var countToShow = (totalCt > maxCt) ? maxCt : totalCt;
-        for (var j = 0; j < countToShow; j++) {
-            var c = contacts[j];
-            var cId = c[:id] as String;
-            var cName = c[:name] as String;
-            var selectedId = ContactManager.getActivityTelemetryContactId();
-            var isSel = (hasTarget && ContactManager.isActivityTelemetryContactTarget() && selectedId != null && selectedId.equals(cId));
-            addItem(new WatchUi.MenuItem(cName, isSel ? activeBadge : null, "CT_" + cId, null));
-        }
+        // 3. FIT Logging toggle (dedicated to DataField sandbox)
+        var fitLog = Storage.getValue("fitLoggingEnabled") != false;
+        var fitSub = I18n.get(fitLog ? Rez.Strings.SettingActiveOn : Rez.Strings.SettingInactiveOff);
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.SettingWardriving), fitSub, "FIT_TOGGLE", null));
 
-        if (totalCt > maxCt) {
-            var moreText = I18n.format(Rez.Strings.MoreContacts, [ (totalCt - maxCt) ]);
-            addItem(new WatchUi.MenuItem(moreText, null, "MORE_INFO", null));
-        }
+        // 4. Simulator toggle
+        var simEnabled = Storage.getValue("sim_virtualNodeEnabled") == true;
+        var simSub = I18n.get(simEnabled ? Rez.Strings.SettingEnabled : Rez.Strings.SettingDisabled);
+        addItem(new WatchUi.MenuItem(I18n.get(Rez.Strings.DfMenuSimulator), simSub, "SIM_TOGGLE", null));
     }
 }
 
@@ -115,23 +104,23 @@ class DataFieldSettingsDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return;
         }
+        if (id.equals("FIT_TOGGLE")) {
+            var fitEnabled = Storage.getValue("fitLoggingEnabled") != false;
+            Storage.setValue("fitLoggingEnabled", !fitEnabled);
+            var fitState = I18n.get(!fitEnabled ? Rez.Strings.SettingActiveOn : Rez.Strings.SettingInactiveOff);
+            item.setSubLabel(fitState);
+            WatchUi.requestUpdate();
+            return;
+        }
         if (id.equals("TARGET_NONE")) {
             ContactManager.disableActivityTelemetryTarget();
             WatchUi.showToast(I18n.get(Rez.Strings.DfToastTxOff), null);
             WatchUi.popView(WatchUi.SLIDE_RIGHT);
             return;
         }
-        if (id.equals("MORE_INFO")) {
-            return;
-        }
         if (id.find("CH_") == 0) {
             var chIdx = id.substring(3, id.length()).toNumber();
             ContactManager.selectActivityTelemetryChannel(chIdx, item.getLabel());
-            TelemetryDispatcher.getInstance().triggerImmediateBeacon();
-            WatchUi.showToast(I18n.format(Rez.Strings.TargetActiveToast, [ item.getLabel() ]), null);
-        } else if (id.find("CT_") == 0) {
-            var cId = id.substring(3, id.length());
-            ContactManager.selectActivityTelemetryContact(cId, item.getLabel());
             TelemetryDispatcher.getInstance().triggerImmediateBeacon();
             WatchUi.showToast(I18n.format(Rez.Strings.TargetActiveToast, [ item.getLabel() ]), null);
         }

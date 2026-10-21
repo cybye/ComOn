@@ -2,7 +2,7 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
 
-class ChatThreadDelegate extends WatchUi.InputDelegate {
+class ChatThreadDelegate extends WatchUi.BehaviorDelegate {
     private var _view as ChatThreadView;
     private var _replyMenuPending as Boolean = false;
     private var _replyMenuRequestedAt as Number = 0;
@@ -10,7 +10,7 @@ class ChatThreadDelegate extends WatchUi.InputDelegate {
     private var _backRequestedAt as Number = 0;
 
     function initialize(view as ChatThreadView) {
-        InputDelegate.initialize();
+        BehaviorDelegate.initialize();
         _view = view;
         _view.onReturnToChat = method(:onReturnToChat);
     }
@@ -18,6 +18,26 @@ class ChatThreadDelegate extends WatchUi.InputDelegate {
     public function onReturnToChat() as Void {
         _replyMenuPending = false;
         _backPending = false;
+    }
+
+    function onSelect() as Boolean {
+        openReplyMenu("select_button");
+        return true;
+    }
+
+    function onBack() as Boolean {
+        popChatView();
+        return true;
+    }
+
+    function onPreviousPage() as Boolean {
+        _view.scrollUp();
+        return true;
+    }
+
+    function onNextPage() as Boolean {
+        _view.scrollDown();
+        return true;
     }
 
     private function openReplyMenu(source as String) as Void {

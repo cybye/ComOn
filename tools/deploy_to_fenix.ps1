@@ -3,6 +3,11 @@ param(
     [switch]$DataFieldOnly
 )
 
+if ($AppOnly -and $DataFieldOnly) {
+    Write-Error "Cannot specify both -AppOnly and -DataFieldOnly"
+    exit 1
+}
+
 $shell = New-Object -ComObject Shell.Application
 $computer = $shell.Namespace(17) # ssfDRIVES / My Computer
 $fenix = $computer.Items() | Where-Object { $_.Name -like '*fenix*' -or $_.Name -like '*Garmin*' } | Select-Object -First 1
@@ -19,8 +24,8 @@ if ($fenix) {
                 $appsFolder = $apps.GetFolder
                 
                 if (-not $AppOnly) {
-                    $dfCandidate = "bin\ComOnDataField_fenix847mm.prg"
-                    if (-not (Test-Path $dfCandidate)) { $dfCandidate = "bin\ComOnDatafield.prg" }
+                    $dfCandidate = "bin\ComOnDatafield.prg"
+                    if (-not (Test-Path $dfCandidate)) { $dfCandidate = "bin\ComOnDataField_fenix847mm.prg" }
                     $dfSource = (Resolve-Path $dfCandidate).Path
                     Write-Host "Deploying $dfSource to Apps..."
                     $appsFolder.CopyHere($dfSource, 16)

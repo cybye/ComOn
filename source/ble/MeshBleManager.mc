@@ -56,8 +56,9 @@ class MeshBleManager {
     private var _notificationsReady as Boolean = false;
     private var _isInboxPolling as Boolean = false;
     private var _inboxPollCount as Number = 0;
+    private var _inboxSkippedCount as Number = 0;
     private static const MAX_INBOX_POLL_MESSAGES as Number = 5;
-    private static const CONTACT_FRAME_SIZE as Number = 148;
+    private static const MAX_SKIPPED_DATAGRAMS as Number = 20;
     private var _txQueue as Array<ByteArray> = [] as Array<ByteArray>;
     private var _isWriting as Boolean = false;
     private var _txTimeoutTimer as SoftTimer? = null;
@@ -72,6 +73,10 @@ class MeshBleManager {
 
     public function isDataField() as Boolean {
         return _isDataField;
+    }
+
+    public function tickDataField() as Void {
+        // Periodic 1Hz tick from DataField compute()
     }
 
     //! DataField apps do not have permission for Toybox.Timer
@@ -614,6 +619,7 @@ class MeshBleManager {
         }
         _isInboxPolling = true;
         _inboxPollCount = 0;
+        _inboxSkippedCount = 0;
         if (_inboxPollTimeoutTimer == null) {
             _inboxPollTimeoutTimer = safeTimer();
         } else {
@@ -638,6 +644,7 @@ class MeshBleManager {
     private function finishInboxPoll() as Void {
         _isInboxPolling = false;
         _inboxPollCount = 0;
+        _inboxSkippedCount = 0;
         if (_inboxPollTimeoutTimer != null) {
             _inboxPollTimeoutTimer.stop();
             _inboxPollTimeoutTimer = null;
@@ -719,20 +726,30 @@ class MeshBleManager {
         }
 
         if (_rxFragmentBuffer != null) {
-            var buffer = _rxFragmentBuffer as ByteArray;
-            buffer.addAll(value);
-            // Contact records have a fixed length, so don't rely on the short-chunk heuristic
-            var isCompleteContact = buffer[0] == MeshProtocol.RESP_CODE_CONTACT && buffer.size() >= CONTACT_FRAME_SIZE;
-            if (value.size() < 20 || isCompleteContact) {
+            // 1. Detect nRF52 BLE UART partial-write retry (re-sent from byte 0)
+            if (MeshFrameParser.isFragmentRetry(_rxFragmentBuffer, value)) {
+                _rxFragmentBuffer = []b;
+                (_rxFragmentBuffer as ByteArray).addAll(value);
+                scheduleFragmentTimeout();
+                return;
+            }
+            // 2. Check if a new protocol frame boundary arrived
+            if (MeshFrameParser.isFrameBoundary(_rxFragmentBuffer, value)) {
                 finishFragmentedFrame();
             } else {
-                scheduleFragmentTimeout();
+                var buffer = _rxFragmentBuffer as ByteArray;
+                buffer.addAll(value);
+                if (value.size() < 20 || MeshFrameParser.isCompleteKnownSizeFrame(buffer)) {
+                    finishFragmentedFrame();
+                } else {
+                    scheduleFragmentTimeout();
+                }
+                return;
             }
-            return;
         }
 
         var firstByte = value[0] as Number;
-        if (value.size() == 20 && isFragmentablePacket(firstByte)) {
+        if (value.size() == 20 && MeshFrameParser.isFragmentablePacket(firstByte) && !MeshFrameParser.isCompleteKnownSizeFrame(value)) {
             _rxFragmentBuffer = []b;
             (_rxFragmentBuffer as ByteArray).addAll(value);
             scheduleFragmentTimeout();
@@ -740,16 +757,6 @@ class MeshBleManager {
         }
 
         processCharacteristicFrame(value);
-    }
-
-    private function isFragmentablePacket(packetType as Number) as Boolean {
-        return packetType == MeshProtocol.RESP_CODE_CONTACT_MSG ||
-               packetType == MeshProtocol.RESP_CODE_CHANNEL_MSG ||
-               packetType == MeshProtocol.RESP_CODE_CONTACT_MSG_V3 ||
-               packetType == MeshProtocol.RESP_CODE_CHANNEL_MSG_V3 ||
-               packetType == MeshProtocol.RESP_CODE_CONTACT ||
-               packetType == MeshProtocol.RESP_CODE_CHANNEL_INFO ||
-               packetType >= 0x80;
     }
 
     private function scheduleFragmentTimeout() as Void {
@@ -937,9 +944,17 @@ class MeshBleManager {
             sendRaw(MeshProtocol.encodeSyncNextMessage());
             return;
         }
+        if (_syncStage == 6 && firstByte == MeshProtocol.RESP_CODE_CHANNEL_DATA_RECV) {
+            var parsedStage6Data = MeshFrameParser.parseChannelData(value);
+            if (parsedStage6Data != null && parsedStage6Data.hasKey(:snr)) {
+                loraSnr = parsedStage6Data[:snr] as Number;
+            }
+            sendRaw(MeshProtocol.encodeSyncNextMessage());
+            return;
+        }
 
         // 9. Stage 6: Message inbox complete (RESP_CODE_NO_MORE_MESSAGES = 10 OR RESP_CODE_ERR = 1)
-        if (_syncStage == 6 && (firstByte == MeshProtocol.RESP_CODE_NO_MORE_MESSAGES || firstByte == MeshProtocol.RESP_CODE_ERR)) {
+        if (_syncStage == 6 && ((firstByte == MeshProtocol.RESP_CODE_NO_MORE_MESSAGES && value.size() == 1) || (firstByte == MeshProtocol.RESP_CODE_ERR && value.size() <= 2))) {
             System.println("BLE session sync complete: " + _syncedMessagesCount + " messages synced");
             finishSessionSync();
             return;
@@ -961,7 +976,20 @@ class MeshBleManager {
             }
             return;
         }
-        if (_isInboxPolling && (firstByte == MeshProtocol.RESP_CODE_NO_MORE_MESSAGES || firstByte == MeshProtocol.RESP_CODE_ERR)) {
+        if (_isInboxPolling && firstByte == MeshProtocol.RESP_CODE_CHANNEL_DATA_RECV) {
+            var parsedPollData = MeshFrameParser.parseChannelData(value);
+            if (parsedPollData != null && parsedPollData.hasKey(:snr)) {
+                loraSnr = parsedPollData[:snr] as Number;
+            }
+            _inboxSkippedCount++;
+            if (_inboxSkippedCount <= MAX_SKIPPED_DATAGRAMS) {
+                sendRaw(MeshProtocol.encodeSyncNextMessage());
+            } else {
+                finishInboxPoll();
+            }
+            return;
+        }
+        if (_isInboxPolling && ((firstByte == MeshProtocol.RESP_CODE_NO_MORE_MESSAGES && value.size() == 1) || (firstByte == MeshProtocol.RESP_CODE_ERR && value.size() <= 2))) {
             System.println("BLE inbox poll: complete (" + _inboxPollCount + " messages)");
             finishInboxPoll();
             return;
@@ -1004,7 +1032,21 @@ class MeshBleManager {
             WatchUi.requestUpdate();
             return;
         }
-        if (firstByte == 0x80 /* PushAdvert */ || firstByte == 0x81 /* PushPathUpdated */ || firstByte == 0x88 /* PushLogRxData */) {
+        if (firstByte == 0x88 /* PushLogRxData */) {
+            if (value.size() >= 3) {
+                var snrRaw = value[1] as Number;
+                var rssiRaw = value[2] as Number;
+                if (snrRaw > 127) { snrRaw -= 256; }
+                if (rssiRaw > 127) { rssiRaw -= 256; }
+                loraSnr = (snrRaw / 4).toNumber();
+                loraRssi = rssiRaw;
+                if (WatchUi has :requestUpdate) {
+                    WatchUi.requestUpdate();
+                }
+            }
+            return;
+        }
+        if (firstByte == 0x80 /* PushAdvert */ || firstByte == 0x81 /* PushPathUpdated */) {
             return;
         }
 
@@ -1024,6 +1066,18 @@ class MeshBleManager {
         // 13. Live incoming channel message while idle (_syncStage == 0)
         if (firstByte == MeshProtocol.RESP_CODE_CHANNEL_MSG || firstByte == MeshProtocol.RESP_CODE_CHANNEL_MSG_V3) {
             parseChannelMessage(value, true);
+            return;
+        }
+
+        // 13b. Live incoming channel datagram (e.g. position/telemetry packet) -> update SNR only
+        if (firstByte == MeshProtocol.RESP_CODE_CHANNEL_DATA_RECV) {
+            var parsedData = MeshFrameParser.parseChannelData(value);
+            if (parsedData != null && parsedData.hasKey(:snr)) {
+                loraSnr = parsedData[:snr] as Number;
+                if (WatchUi has :requestUpdate) {
+                    WatchUi.requestUpdate();
+                }
+            }
             return;
         }
 
@@ -1058,6 +1112,9 @@ class MeshBleManager {
 
         var sender = parsed[:sender] as String;
         var messageText = parsed[:text] as String;
+        if (messageText == null || messageText.length() == 0 || (sender.equals("Mesh") && messageText.length() < 2)) {
+            return;
+        }
         var targetId = "CH_" + channelIndex;
         lastSender = sender;
         lastReceivedMessage = messageText;

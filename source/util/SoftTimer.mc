@@ -57,6 +57,7 @@ class SoftTimerScheduler {
 
     private var _timers as Array<SoftTimer> = [] as Array<SoftTimer>;
     private var _hwTimer as Timer.Timer? = null;
+    private var _isDataFieldMode as Boolean = false;
 
     public static function getInstance() as SoftTimerScheduler {
         if (_instance == null) {
@@ -66,6 +67,14 @@ class SoftTimerScheduler {
     }
 
     function initialize() {
+    }
+
+    public function setDataFieldMode(val as Boolean) as Void {
+        _isDataFieldMode = val;
+        if (val && _hwTimer != null) {
+            _hwTimer.stop();
+            _hwTimer = null;
+        }
     }
 
     public function add(timer as SoftTimer) as Void {
@@ -83,6 +92,9 @@ class SoftTimerScheduler {
     }
 
     private function reschedule() as Void {
+        if (_isDataFieldMode) {
+            return;
+        }
         if (_hwTimer != null) {
             _hwTimer.stop();
         }

@@ -7,6 +7,14 @@
             "name": "Run App",
             "stopAtLaunch": false,
             "device": "${command:GetTargetDevice}"
+        },
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Run Data Field (datafield.jungle)",
+            "stopAtEntry": false,
+            "device": "${command:GetTargetDevice}",
+            "project": "${workspaceFolder}/datafield.jungle"
         }
     ]
 }

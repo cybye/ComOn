@@ -2,19 +2,33 @@ import Toybox.WatchUi;
 import Toybox.Lang;
 import Toybox.System;
 
-class ChatsListDelegate extends WatchUi.InputDelegate {
+class ChatsListDelegate extends WatchUi.BehaviorDelegate {
     private var _view as ChatsListView;
     private var _navigationPending as Boolean = false;
     private var _navigationRequestedAt as Number = 0;
 
     function initialize(view as ChatsListView) {
-        InputDelegate.initialize();
+        BehaviorDelegate.initialize();
         _view = view;
         _view.onReturnToList = method(:onReturnToList);
     }
 
     public function onReturnToList() as Void {
         _navigationPending = false;
+    }
+
+    function onSelect() as Boolean {
+        return selectCurrentItem();
+    }
+
+    function onPreviousPage() as Boolean {
+        _view.previousItem();
+        return true;
+    }
+
+    function onNextPage() as Boolean {
+        _view.nextItem();
+        return true;
     }
 
     private function beginNavigation() as Boolean {

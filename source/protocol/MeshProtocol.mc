@@ -35,6 +35,7 @@ module MeshProtocol {
     public const RESP_CODE_CHANNEL_MSG_V3   = 17;
     public const RESP_CODE_CHANNEL_INFO     = 18;
     public const RESP_CODE_STATS            = 24;
+    public const RESP_CODE_CHANNEL_DATA_RECV = 27; // 0x1B: Inbound channel datagram
     public const PUSH_CODE_MSG_WAITING      = 0x83;
 
     //! Encode a channel text message (e.g. broadcast or group channel)

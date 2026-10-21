@@ -8,9 +8,7 @@ if ($fenix) {
     if ($apps) {
         $logs = $apps.GetFolder.Items() | Where-Object { $_.Name -eq 'LOGS' }
         if ($logs) {
-            $targetDir = "tmp_logs"
-            if (Test-Path $targetDir) { Remove-Item -Recurse -Force $targetDir }
-            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            $targetDir = (Resolve-Path "tmp_logs").Path
             $destFolder = $shell.Namespace($targetDir)
             foreach ($item in $logs.GetFolder.Items()) {
                 Write-Host "Copying $($item.Name)..."

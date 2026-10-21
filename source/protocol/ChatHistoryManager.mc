@@ -8,6 +8,15 @@ class ChatHistoryManager {
 
     private static var _messages as Array<Dictionary> = [] as Array<Dictionary>;
     private static var _initialized as Boolean = false;
+    private static var _batchMode as Boolean = false;
+
+    public static function setBatchMode(enabled as Boolean) as Void {
+        var wasBatching = _batchMode;
+        _batchMode = enabled;
+        if (!enabled && wasBatching && _initialized) {
+            persistMessages();
+        }
+    }
 
     public static const STATUS_QUEUED as Number         = 0; // Waiting in spool or awaiting node response
     public static const STATUS_SENT_NODE as Number      = 1; // Node acknowledged receipt via BLE (Single check ✓)
@@ -38,11 +47,13 @@ class ChatHistoryManager {
                     var tm = it.hasKey("time") ? it["time"] : (it.hasKey(:time) ? it[:time] : Time.now().value());
                     var isRead = it.hasKey("isRead") ? (it["isRead"] as Boolean) : (it.hasKey(:isRead) ? (it[:isRead] as Boolean) : isOut);
                     var st = it.hasKey("status") ? it["status"] : (it.hasKey(:status) ? it[:status] : (isOut ? STATUS_CONFIRMED_MESH : 0));
-                    if (tid != null && txt != null) {
+                    var textStr = (txt != null) ? (txt as String) : "";
+                    var senderStr = (snd != null) ? (snd as String) : "Mesh";
+                    if (tid != null && textStr.length() > 0 && !(senderStr.equals("Mesh") && textStr.length() < 2)) {
                         loaded.add({
                             :targetId => tid as String,
-                            :sender => (snd != null) ? (snd as String) : "Mesh",
-                            :text => txt as String,
+                            :sender => senderStr,
+                            :text => textStr,
                             :isOutgoing => isOut,
                             :time => tm as Number,
                             :isRead => isRead,
@@ -83,6 +94,9 @@ class ChatHistoryManager {
     }
 
     public static function addMessageFull(targetId as String, sender as String, text as String, isOutgoing as Boolean, customTime as Number?, isRead as Boolean?, status as Number?) as Void {
+        if (text == null || text.length() == 0 || (sender.equals("Mesh") && text.length() < 2)) {
+            return;
+        }
         initializeHistory();
 
         var t = (customTime != null) ? customTime : Time.now().value();
@@ -105,7 +119,9 @@ class ChatHistoryManager {
             _messages.remove(_messages[0]);
         }
 
-        persistMessages();
+        if (!_batchMode) {
+            persistMessages();
+        }
     }
 
     private static function persistMessages() as Void {

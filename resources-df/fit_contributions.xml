@@ -12,5 +12,8 @@
         <fitField id="3" displayInChart="true" sortOrder="3" precision="0"
                   chartTitle="@Strings.FitBatChart" dataLabel="@Strings.FitBatLabel"
                   unitLabel="@Strings.FitBatUnit" fillColor="#FF9100" />
+        <fitField id="4" displayInChart="false" sortOrder="4" precision="0"
+                  chartTitle="@Strings.FitNodeNameChart" dataLabel="@Strings.FitNodeNameLabel"
+                  unitLabel="@Strings.FitNodeNameUnit" fillColor="#888888" />
     </fitContributions>
 </resources>

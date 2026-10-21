@@ -8,6 +8,9 @@ class MeshBackgroundInboxStore {
     private static const MAX_HISTORY as Number = 40;
 
     public static function addIncomingMessage(targetId as String, sender as String, text as String) as Void {
+        if (text == null || text.length() == 0 || (sender.equals("Mesh") && text.length() < 2)) {
+            return;
+        }
         var messages = [] as Array<Dictionary>;
         var stored = Storage.getValue(STORAGE_KEY);
         if (stored instanceof Array) {

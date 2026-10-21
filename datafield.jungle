@@ -1,6 +1,7 @@
 project.manifest = manifest_df.xml
+base.excludeAnnotations = background
 base.sourcePath = source/ble;source/protocol;source/telemetry/TelemetryAggregator.mc;source/telemetry/TelemetryDispatcher.mc;source/datafield;source/util
-base.resourcePath = resources
+base.resourcePath = resources;resources-df
 
 # AMOLED targets
 fenix847mm.excludeAnnotations = mip

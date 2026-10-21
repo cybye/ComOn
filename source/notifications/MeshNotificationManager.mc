@@ -58,20 +58,6 @@ class MeshNotificationManager {
             // ignore
         }
 
-        var primaryAction = NotificationBuilder.makeActionData(NotificationBuilder.ACTION_CHAT, _lastTargetId);
-        var options = {
-            :body => text,
-            :data => primaryAction,
-            :dismissPrevious => true,
-            :actions => NotificationBuilder.buildTargetActions(
-                _lastTargetId,
-                I18n.get(Rez.Strings.NotifActionOpenChat),
-                I18n.get(Rez.Strings.NotifActionReply),
-                I18n.get(Rez.Strings.NotifActionPosition),
-                I18n.get(Rez.Strings.NotifActionOk)
-            )
-        };
-
         // Build descriptive notification title (e.g. "#public: Seb_Herb" or "@Alice")
         var channelName = null as String?;
         if (_lastTargetId.find("CH_") == 0) {
@@ -86,13 +72,12 @@ class MeshNotificationManager {
         }
         var notifTitle = NotificationBuilder.formatNotificationTitle(_lastTargetId, sender, channelName);
 
-        System.println("MeshNotificationManager: showNotification called for " + notifTitle + " - " + text);
-        try {
-            Notifications.showNotification(notifTitle, I18n.get(Rez.Strings.NotifIncomingMsg), options);
-            System.println("MeshNotificationManager: showNotification succeeded");
-        } catch (e) {
-            System.println("MeshNotificationManager: showNotification error: " + e.getErrorMessage());
-            e.printStackTrace();
+        System.println("MeshNotificationManager: in-app toast for " + notifTitle + ": " + text);
+        if (WatchUi has :showToast) {
+            WatchUi.showToast(notifTitle + ": " + text, null);
+        }
+        if (WatchUi has :requestUpdate) {
+            WatchUi.requestUpdate();
         }
     }
 
