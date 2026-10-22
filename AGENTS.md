@@ -1,0 +1,6 @@
+# Project Rules: ComOn
+
+## MTP Deployment & Garmin Watch App Updates
+- **MTP Overwrite Failure Prevention:** Windows MTP (`Shell.Application.CopyHere(..., 16)`) silently fails to overwrite existing files inside `GARMIN\Apps` on connected Garmin devices.
+- **Always Clear Before Copy (Use `MoveHere` or Unplug, Not `InvokeVerb("delete")`):** When deploying an updated `.prg` (e.g. `ComOn.prg`) to a connected Garmin watch over MTP, tools/scripts MUST verify and remove any existing `.prg` file in `GARMIN\Apps` before executing the copy operation, and verify the file exists afterward. Note: `$item.InvokeVerb("delete")` blocks on a modal Windows Explorer confirmation prompt; use `$trashNamespace.MoveHere($item, 20)` to move the existing file into a freshly cleared local temp directory, or have the user unplug/replug the watch so Garmin OS consumes `GARMIN\Apps\ComOn.prg`.
+- **Garmin OS App Installation Timing:** Garmin watches only stage, unpack, and delete PRG files in `GARMIN\Apps` when the USB cable is disconnected. If a watch remains connected across multiple test builds, any existing PRG in `GARMIN\Apps` must be cleared out first to guarantee the newly compiled build actually gets deployed.

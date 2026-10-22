@@ -178,14 +178,15 @@ sequenceDiagram
     participant Stor as Toybox.Application.Storage
 
     OS->>BG: onTemporalEvent()
-    BG->>QP: evaluate() [Sleep Window & DND Check]
-    alt Im Schlaf-Fenster (UserProfile)
-        QP-->>BG: skip (quiet_sleep, wakeDelta)
-        BG->>OS: registerForTemporalEvent(wakeDelta) [Pause bis Aufwachen]
+    BG->>BG: Rate-Limit & Watch-Battery Guard (<240s Loop-Schutz, <20% Akku)
+    BG->>QP: evaluate() [Live UserProfile & Persistent Storage Fallback]
+    alt Im Schlaf-Fenster (Quiet Hours)
+        QP-->>BG: skip (quiet_sleep, wakeMoment)
+        BG->>OS: registerForTemporalEvent(wakeMoment) [Einmaliges Time.Moment bis Aufwachen]
         BG->>OS: Background.exit(null)
     else Do Not Disturb aktiv (DND)
         QP-->>BG: skip (quiet_dnd)
-        BG->>OS: registerForTemporalEvent(30 min)
+        BG->>OS: registerForTemporalEvent(30 min Duration)
         BG->>OS: Background.exit(null)
     else Normaler Wachbetrieb
         BG->>BLE: Quick Connect (Budget 8s)
@@ -712,6 +713,31 @@ flowchart TD
        - **Exakte Rahmenlängen- & Boundary-Erkennung (`isCompleteKnownSizeFrame`, `isFrameBoundary`):** Frames mit bekannter Protokolllänge (`0x03`/`0x8A` = 148 B, `0x12` = 50 B, `0x80`/`0x81` = 33 B sowie `0x1B` = `9 + buffer[8]` B) werden exakt bei Erreichen ihrer Solllänge abgeschlossen. `RESP_CODE_NO_MORE_MESSAGES` (`0x0A`) wird nur bei `size == 1` (und außerhalb offener Textnachrichten-Fragmente) als Grenze akzeptiert, `RESP_CODE_ERR` (`0x01`) nur bei `size <= 2`.
        - **Strikte Header- & UTF-8-Validierung (`decodeText`, `parseChannelMessage`, `parseDirectMessage`):** Prüfung auf `channelIndex < 16` und `txtType <= 2` (mit `textOffset += 4` für die 4-Byte-Signatur bei `txtType == 2`). `decodeText` bricht am C-String-Nullterminator (`0x00`) ab, verwirft binäre Steuerbytes (`< 32` außer `\t`, `\n`, `\r`) und dekodiert strikt über `StringUtil.utf8ArrayToString`.
        - **Selbstheilung der Chathistorie:** Beim Laden der Historie (`initializeHistory()`) werden zuvor persistierte leere `"Mesh"`-Phantomnachrichten automatisch aus dem Speicher und Flash bereinigt.
+
+* **ADR 46: Entkopplung des Hintergrund-Nachrichtenspeichers (`BG_PENDING_MESSAGES`) gegen 32KB-Heap-Exhaustion (OOM):**
+    1. *Kontext & Problemstellung*:
+       In den Geräteabsturz-Logs (`CIQ_LOG.YML` um 14:32:06Z und 14:37:05Z) trat auf der Fenix 8 reproduzierbar ein `Out Of Memory Error: 'Failed invoking <symbol>'` in `MeshBackgroundInboxStore.mc:32` (`Storage.setValue(STORAGE_KEY, messages)`) auf.
+       Ursache: Connect IQ limitiert Hintergrundprozesse (`Toybox.Background`) auf einen extrem strikten Maximal-Heap von **32 KB RAM**. Bei jedem Eintreffen einer Hintergrundnachricht lud `MeshBackgroundInboxStore` das gesamte Chathistorie-Array (`cfg_chat_history`, bis zu 40 komplexe Message-Dictionaries mit je 7 Attributen) in den Hintergrund-Heap, um die Nachricht anzuhängen und das gesamte Array zurück in den Flash-Speicher zu serialisieren. Zusammen mit den BLE-GATT-Puffern sprengte die Serialisierung von bis zu 40 Dictionaries das 32KB-Heap-Budget. Infolge des OOM-Crashs stürzte die Hintergrund-VM ab, bevor `requestNextMessage()` gesendet und die Systembenachrichtigung (`Notifications.showNotification`) abgesetzt werden konnte.
+    2. *Lösung & Implementierung*:
+       - **Separater Staging-Key (`StorageKeys.BG_PENDING_MESSAGES` / `cfg_bg_pending_msgs`):** Der Hintergrundprozess liest und schreibt niemals die vollständige Chathistorie (`cfg_chat_history`), sondern puffert neu eingetroffene Hintergrundnachrichten in einer dedizierten, auf maximal 10 Einträge limitierten Staging-Warteschlange.
+       - **Automatisches Draining im Vordergrund (`ChatHistoryManager.initializeHistory`):** Beim Starten der App im Vordergrund (wo ein Vielfaches an Heap zur Verfügung steht) werden alle aufgelaufenen Hintergrundnachrichten aus `cfg_bg_pending_msgs` nahtlos in die Haupt-Chathistorie übernommen, nach `cfg_chat_history` persistiert und der Staging-Key gelöscht.
+       - **Robuste `try/catch`-Kapselung:** Sowohl `MeshBackgroundInboxStore.addIncomingMessage` als auch der Aufruf in `MeshBackgroundNodePoller.storeMessage` sind defensiv gekapselt, sodass eventuelle Speicher- oder Storage-Fehler den Hintergrund-Poller nicht mehr zum Absturz bringen können.
+
+---
+
+* **ADR 47: Temporal Moment-Scheduling, Schlaffenster-Flash-Caching & Watchdog-Runaway-Schutz:**
+    1. *Kontext & Problemstellung*:
+       In der Nacht vom 21. auf den 22. Oktober schaltete sich die Garmin Fenix 8 unerwartet komplett ab und zeichnete keinerlei Firstbeat-Schlaffunktionsdaten auf. Nach dem manuellen Neustart am Morgen lag der Akkustand bei **93%**, was eine reguläre Akkuerschöpfung ausschloss.
+       Die Diagnose des Geräte-Logs `ComOn.TXT` deckte eine fatale Kaskade im Garmin-OS-Scheduler auf:
+       - **Duration-Overflow im OS-Scheduler:** Bei Erkennung des Schlaffensters um 22:46:01 (`untilWake = 29639s` ~ 8,2 h) übergab `completeBackgroundEvent()` ein `Time.Duration(29699)` an `Background.registerForTemporalEvent()`. In Connect IQ definiert ein `Duration`-Objekt jedoch ein *periodisch wiederkehrendes Intervall*. Das Betriebssystem interpretierte den 8-Stunden-Wert als abgelaufen oder fehlerhaft und triggerte das Temporal-Event 5-mal innerhalb weniger Sekunden unmittelbar neu (`fail streak 2`).
+       - **Verlust der Schlaffenster-Erkennung:** Infolge der schnellen Re-Invocations und des System-Schlafmodus lieferte `UserProfile.getProfile()` im Hintergrundprozess `null` bzw. nicht initialisierte `sleepTime`-Werte zurück. Da kein Cache existierte, fiel `secondsUntilWake()` auf `0` zurück und startete nächtliche BLE-Scans.
+       - **Firstbeat-Schlaftracking-Reset & Watchdog-Notabschaltung:** Zwischen 22:46 und 01:23 Uhr wachte die Uhr wiederholt auf, scannte via BLE, lud bis zu 21 Datagramme herunter und feuerte Systembenachrichtigungen mit haptischer Vibration ab. Firstbeat wertet diese Prozessor-, Funk- und Vibrationsunterbrechungen als Wachphase und verwirft die Schlaferfassung. Nach wiederholten Hintergrundabbrüchen und Systemlimits löste der Garmin-Hardware-Watchdog schließlich eine Schutzabschaltung aus.
+    2. *Lösung & Implementierung*:
+       - **Strikte Trennung von `Time.Moment` und `Time.Duration` (`scheduleTemporalEvent` & `scheduleMomentEvent`):** Schlaffenster-Pausen bis zum Morgen werden ausschließlich über ein Ziel-`Time.Moment` (`Time.now().add(new Time.Duration(untilWake + 60))`) terminiert. Alle Intervalle $> 3600\,\text{s}$ werden automatisch als Einmal-Moment registriert, um OS-Timerüberläufe zu verhindern. Reguläre Tagesabfragen ($300..3600\,\text{s}$) nutzen weiterhin periodische `Time.Duration`.
+       - **Resilientes Flash-Caching (`StorageKeys.CACHED_SLEEP_SECS` / `CACHED_WAKE_SECS`):** Bei jedem erfolgreichen Auslesen von `UserProfile.getProfile()` (sowohl beim Start der Vordergrund-App in `initForeground()` als auch im Hintergrund) werden die Sekunden ab Mitternacht persistent in `Storage` gesichert. Fällt der Live-Profilaufruf im Hintergrund aus, nutzt `MeshQuietPolicy.secondsUntilWake()` automatisch die gecachten Werte als Fallback.
+       - **Runaway-Loop & Watchdog-Drosselung (`StorageKeys.BG_LAST_RUN_AT`):** Tritt ein Temporal-Event innerhalb von weniger als 240 Sekunden nach der letzten Hintergrundausführung auf, wird die Ausführung sofort abgebrochen (< 10 ms CPU-Zeit, 0 BLE-Aktivität), ein 5-Minuten-Sicherheitsintervall registriert und `Background.exit(null)` aufgerufen.
+       - **Watch-Battery Safety-Guard:** Sinkt der Akkustand der Uhr unter 20 % (`System.getSystemStats().battery < 20.0`), stellt der Hintergrund-Poller alle BLE-Aktivitäten ein und plant eine ressourcenschonende Prüfung erst in 1 Stunde ein.
+       - **Schlaffenster-Prüfung beim Verlassen der App (`MeshCoreApp.onStop`):** Wird die App abends innerhalb des Schlaffensters beendet, plant `onStop()` direkt das Aufwach-`Moment` für den nächsten Morgen ein, anstatt den 5-Minuten-Tagestakt blind zu starten.
 
 ---
 

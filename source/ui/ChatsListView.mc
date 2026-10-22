@@ -45,6 +45,8 @@ class ChatsListView extends WatchUi.View {
     }
 
     public function updateItemList() as Void {
+        ChatHistoryManager.initializeHistory();
+        ChatHistoryManager.drainBackgroundPendingMessages();
         var list = [] as Array<Dictionary>;
 
         // 1. Group Channels (e.g. #public)

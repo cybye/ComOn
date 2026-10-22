@@ -19,26 +19,65 @@ module MeshQuietPolicy {
         return Storage.getValue(StorageKeys.BG_QUIET_MODE) != false;
     }
 
-    //! Seconds until the configured sleep window ends, or 0 when the current
-    //! time is outside the window (or the profile cannot be read).
-    function secondsUntilWake() as Number {
+    //! Reads profile sleep/wake times and saves them into persistent storage.
+    //! Safe to call from both foreground and background contexts.
+    function updateSleepCache() as Void {
         try {
             var profile = UserProfile.getProfile();
-            if (profile == null || !(profile has :sleepTime) || !(profile has :wakeTime)) {
-                return 0;
+            if (profile != null && (profile has :sleepTime) && (profile has :wakeTime)) {
+                var sleepTime = profile.sleepTime;
+                var wakeTime = profile.wakeTime;
+                if ((sleepTime instanceof Time.Duration) && (wakeTime instanceof Time.Duration)) {
+                    var sleepSecs = (sleepTime as Time.Duration).value() % SECS_PER_DAY;
+                    var wakeSecs = (wakeTime as Time.Duration).value() % SECS_PER_DAY;
+                    Storage.setValue(StorageKeys.CACHED_SLEEP_SECS, sleepSecs);
+                    Storage.setValue(StorageKeys.CACHED_WAKE_SECS, wakeSecs);
+                }
             }
-            var sleepTime = profile.sleepTime;
-            var wakeTime = profile.wakeTime;
-            if (!(sleepTime instanceof Time.Duration) || !(wakeTime instanceof Time.Duration)) {
-                return 0;
-            }
-            var clock = System.getClockTime();
-            var now = (clock.hour * 3600) + (clock.min * 60) + clock.sec;
-            return secondsUntilWindowEnd(now, (sleepTime as Time.Duration).value() % SECS_PER_DAY, (wakeTime as Time.Duration).value() % SECS_PER_DAY);
         } catch (e) {
-            System.println("MeshQuietPolicy: sleep window read failed: " + e.getErrorMessage());
+            // Profile read may fail defensively in background
+        }
+    }
+
+    //! Seconds until the configured sleep window ends, or 0 when the current
+    //! time is outside the window (or neither live profile nor cached values exist).
+    function secondsUntilWake() as Number {
+        var sleepSecs = null as Number?;
+        var wakeSecs = null as Number?;
+
+        try {
+            var profile = UserProfile.getProfile();
+            if (profile != null && (profile has :sleepTime) && (profile has :wakeTime)) {
+                var sleepTime = profile.sleepTime;
+                var wakeTime = profile.wakeTime;
+                if ((sleepTime instanceof Time.Duration) && (wakeTime instanceof Time.Duration)) {
+                    sleepSecs = (sleepTime as Time.Duration).value() % SECS_PER_DAY;
+                    wakeSecs = (wakeTime as Time.Duration).value() % SECS_PER_DAY;
+                    Storage.setValue(StorageKeys.CACHED_SLEEP_SECS, sleepSecs);
+                    Storage.setValue(StorageKeys.CACHED_WAKE_SECS, wakeSecs);
+                }
+            }
+        } catch (e) {
+            System.println("MeshQuietPolicy: live sleep window read failed: " + e.getErrorMessage());
+        }
+
+        // Fallback to cached profile values if live UserProfile read returned null or unpopulated
+        if (sleepSecs == null || wakeSecs == null) {
+            var cachedSleep = Storage.getValue(StorageKeys.CACHED_SLEEP_SECS);
+            var cachedWake = Storage.getValue(StorageKeys.CACHED_WAKE_SECS);
+            if (cachedSleep instanceof Number && cachedWake instanceof Number) {
+                sleepSecs = cachedSleep as Number;
+                wakeSecs = cachedWake as Number;
+            }
+        }
+
+        if (sleepSecs == null || wakeSecs == null) {
             return 0;
         }
+
+        var clock = System.getClockTime();
+        var now = (clock.hour * 3600) + (clock.min * 60) + clock.sec;
+        return secondsUntilWindowEnd(now, sleepSecs as Number, wakeSecs as Number);
     }
 
     //! Pure window arithmetic (seconds since midnight), split out for testability.

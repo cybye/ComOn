@@ -390,6 +390,11 @@ class MeshBackgroundNodePoller {
     private function processFrame(value as ByteArray) as Void {
         var code = value[0] as Number;
         if (_awaitingBattery) {
+            // Asynchronous push frames (e.g. 0x88 RX log) may arrive before the 0x0C battery reply;
+            // ignore them while keeping _awaitingBattery active.
+            if (code >= 0x80 && code != MeshFrameParser.PUSH_CODE_MSG_WAITING) {
+                return;
+            }
             _awaitingBattery = false;
             if (code == MeshFrameParser.RESP_CODE_BATT_AND_STORAGE) {
                 storeBattery(value);
@@ -400,6 +405,10 @@ class MeshBackgroundNodePoller {
             return;
         }
 
+        if (code == MeshFrameParser.RESP_CODE_BATT_AND_STORAGE) {
+            storeBattery(value);
+            return;
+        }
         if ((code == MeshFrameParser.RESP_CODE_NO_MORE_MESSAGES && value.size() == 1) ||
             (code == MeshFrameParser.RESP_CODE_ERR && value.size() <= 2)) {
             finish();
@@ -419,6 +428,7 @@ class MeshBackgroundNodePoller {
             // Binary channel datagram (e.g. position/telemetry report) - not a chat message,
             // but queued in the node's FIFO offline sync buffer, so continue draining.
             _skippedDatagramCount += 1;
+            System.println("Background poll: skipped 0x1B datagram (" + _skippedDatagramCount + "), requesting next");
             if (_skippedDatagramCount <= MAX_SKIPPED_DATAGRAMS) {
                 requestNextMessage();
             } else {
@@ -505,7 +515,6 @@ class MeshBackgroundNodePoller {
         if (text == null || text.length() == 0 || (sender.equals("Mesh") && text.length() < 2)) {
             return;
         }
-        MeshBackgroundInboxStore.addIncomingMessage(targetId, sender, text);
         _messageCount += 1;
         _lastSender = sender;
         _lastMessage = text;
@@ -519,6 +528,11 @@ class MeshBackgroundNodePoller {
         }
         if (!knownTarget) {
             _targetIds.add(targetId);
+        }
+        try {
+            MeshBackgroundInboxStore.addIncomingMessage(targetId, sender, text);
+        } catch (e) {
+            System.println("Background poll: store incoming message failed: " + e.getErrorMessage());
         }
     }
 

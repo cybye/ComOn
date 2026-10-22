@@ -34,11 +34,27 @@ if ($fenix) {
                 }
 
                 if (-not $DataFieldOnly) {
+                    $existingApp = $appsFolder.Items() | Where-Object { $_.Name -ieq 'ComOn.prg' } | Select-Object -First 1
+                    if ($existingApp) {
+                        Write-Host "Moving existing ComOn.prg out of GARMIN\Apps before copy..."
+                        $trashDir = Join-Path $env:TEMP "comon_mtp_trash"
+                        if (Test-Path $trashDir) { Remove-Item -Recurse -Force $trashDir }
+                        New-Item -ItemType Directory -Path $trashDir | Out-Null
+                        $trashFolder = $shell.Namespace($trashDir)
+                        $trashFolder.MoveHere($existingApp, 20)
+                        Start-Sleep -Seconds 3
+                    }
                     $appSource = (Resolve-Path "bin\ComOn.prg").Path
                     Write-Host "Deploying $appSource to Apps..."
                     $appsFolder.CopyHere($appSource, 16)
                     Write-Host "Waiting for App MTP transfer..."
                     Start-Sleep -Seconds 8
+                    $verifyApp = $appsFolder.Items() | Where-Object { $_.Name -ieq 'ComOn.prg' } | Select-Object -First 1
+                    if ($verifyApp) {
+                        Write-Host "Verified ComOn.prg in GARMIN\Apps!"
+                    } else {
+                        Write-Warning "ComOn.prg not visible in GARMIN\Apps after copy!"
+                    }
                 }
                 
                 Write-Host "Deployment completed successfully!"

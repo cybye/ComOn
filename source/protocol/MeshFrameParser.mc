@@ -104,7 +104,7 @@ module MeshFrameParser {
 
     //! Validates whether a chunk is the start of a new message frame (0x07, 0x08, 0x10, 0x11).
     public function isNewMessageHeader(chunk as ByteArray?) as Boolean {
-        if (chunk == null || chunk.size() < 12) {
+        if (chunk == null || chunk.size() < 9) {
             return false;
         }
         var code = chunk[0] as Number;
@@ -167,10 +167,10 @@ module MeshFrameParser {
             return true;
         }
 
-        // Fixed-size frames (0x03, 0x8A, 0x12, 0x1B) should not be split by heuristic headers mid-frame
-        if (bufCode == RESP_CODE_CONTACT || bufCode == PUSH_CODE_NEW_ADVERT ||
-            bufCode == RESP_CODE_CHANNEL_INFO || bufCode == RESP_CODE_CHANNEL_DATA_RECV) {
-            return false;
+        // 11-byte battery & storage response [0x0C, mv_lo, mv_hi, used_0..3, total_0..3]
+        if (chunkSize == 11 && firstByte == RESP_CODE_BATT_AND_STORAGE && !isMessageFrame(bufCode) &&
+            chunk[5] == 0 && chunk[6] == 0 && chunk[9] == 0 && chunk[10] == 0) {
+            return true;
         }
 
         if (isMessageFrame(firstByte) && isNewMessageHeader(chunk)) {

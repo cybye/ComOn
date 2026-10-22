@@ -41,6 +41,7 @@ class MeshCoreApp extends Application.AppBase {
         ContactManager.loadFromStorage();
         ContactManager.ensureBackgroundIdentityCaches();
         ChatHistoryManager.reloadFromStorage();
+        MeshQuietPolicy.updateSleepCache();
         // Register notification handler before BLE setup so that action buttons
         // are never stripped from notifications that arrive during early connect
         // (i.e. before ChatsListView.onShow() has had a chance to call register()).
@@ -102,6 +103,15 @@ class MeshCoreApp extends Application.AppBase {
 
         if ((intervalSecs as Number) > 0) {
             try {
+                if (MeshQuietPolicy.isEnabled()) {
+                    var untilWake = MeshQuietPolicy.secondsUntilWake();
+                    if (untilWake > 0) {
+                        var wakeMoment = Time.now().add(new Time.Duration(untilWake + 60));
+                        Background.registerForTemporalEvent(wakeMoment);
+                        System.println("MeshCoreApp: sleep window active on exit, registered wake temporal event in " + (untilWake + 60) + "s");
+                        return;
+                    }
+                }
                 Background.registerForTemporalEvent(new Time.Duration(intervalSecs as Number));
                 System.println("MeshCoreApp: registered temporal event for " + intervalSecs + "s");
             } catch (e) {

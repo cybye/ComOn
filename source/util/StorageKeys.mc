@@ -4,6 +4,7 @@ import Toybox.Lang;
 module StorageKeys {
     // Cross-Process Shared Message Store
     public const CHAT_HISTORY                  as String = "cfg_chat_history";
+    public const BG_PENDING_MESSAGES           as String = "cfg_bg_pending_msgs";
 
     // Foreground Lifecycle & Heartbeat
     public const FOREGROUND_ACTIVE             as String = "cfg_foreground_active";
@@ -18,6 +19,9 @@ module StorageKeys {
     public const BG_QUIET_MODE                 as String = "cfg_bg_quiet_mode";          // Boolean, default true: skip polls in sleep window / DND
     public const BG_FAIL_STREAK                as String = "cfg_bg_fail_streak";         // Number of consecutive runs without node connection
     public const BG_UNPAIR_DROPS_BOND          as String = "cfg_bg_unpair_drops_bond";   // Set if unpairDevice() was observed to remove the system bond
+    public const BG_LAST_RUN_AT                as String = "cfg_bg_last_run_at";         // Timestamp (s) of last background entry to prevent rapid loops
+    public const CACHED_SLEEP_SECS             as String = "cfg_cached_sleep_secs";      // Seconds since midnight for configured sleep start
+    public const CACHED_WAKE_SECS              as String = "cfg_cached_wake_secs";       // Seconds since midnight for configured wake end
 
     // Contact & Channel Identity Caches (Foreground -> Background)
     public const BG_CONTACT_NAME_PREFIX        as String = "cfg_bg_contact_name_";

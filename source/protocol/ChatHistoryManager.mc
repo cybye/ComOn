@@ -1,6 +1,7 @@
 import Toybox.Lang;
 import Toybox.Time;
 import Toybox.Application.Storage;
+import Toybox.System;
 
 class ChatHistoryManager {
     private static const STORAGE_KEY as String = "cfg_chat_history";
@@ -66,12 +67,58 @@ class ChatHistoryManager {
         } catch (e) {
             _messages = [] as Array<Dictionary>;
         }
+
+        drainBackgroundPendingMessages();
+    }
+
+    public static function drainBackgroundPendingMessages() as Void {
+        try {
+            var bgPending = Storage.getValue(StorageKeys.BG_PENDING_MESSAGES);
+            if (bgPending != null && (bgPending instanceof Array)) {
+                var pendingList = bgPending as Array<Dictionary>;
+                var hasNew = false;
+                for (var p = 0; p < pendingList.size(); p++) {
+                    var it = pendingList[p];
+                    var tid = it.hasKey("targetId") ? it["targetId"] : (it.hasKey(:targetId) ? it[:targetId] : null);
+                    var snd = it.hasKey("sender") ? it["sender"] : (it.hasKey(:sender) ? it[:sender] : null);
+                    var txt = it.hasKey("text") ? it["text"] : (it.hasKey(:text) ? it[:text] : null);
+                    var isOut = it.hasKey("isOutgoing") ? (it["isOutgoing"] as Boolean) : (it.hasKey(:isOutgoing) ? (it[:isOutgoing] as Boolean) : false);
+                    var tm = it.hasKey("time") ? it["time"] : (it.hasKey(:time) ? it[:time] : Time.now().value());
+                    var isRead = it.hasKey("isRead") ? (it["isRead"] as Boolean) : (it.hasKey(:isRead) ? (it[:isRead] as Boolean) : isOut);
+                    var st = it.hasKey("status") ? it["status"] : (it.hasKey(:status) ? it[:status] : (isOut ? STATUS_CONFIRMED_MESH : 0));
+                    var textStr = (txt != null) ? (txt as String) : "";
+                    var senderStr = (snd != null) ? (snd as String) : "Mesh";
+                    if (tid != null && textStr.length() > 0 && !(senderStr.equals("Mesh") && textStr.length() < 2)) {
+                        _messages.add({
+                            :targetId => tid as String,
+                            :sender => senderStr,
+                            :text => textStr,
+                            :isOutgoing => isOut,
+                            :time => (tm != null) ? (tm as Number) : Time.now().value(),
+                            :isRead => isRead,
+                            :status => (st != null) ? (st as Number) : 0
+                        });
+                        hasNew = true;
+                    }
+                }
+                while (_messages.size() > MAX_HISTORY) {
+                    _messages.remove(_messages[0]);
+                }
+                Storage.deleteValue(StorageKeys.BG_PENDING_MESSAGES);
+                if (hasNew && !_batchMode) {
+                    persistMessages();
+                }
+            }
+        } catch (e) {
+            System.println("ChatHistoryManager: error draining bg pending messages: " + e.getErrorMessage());
+        }
     }
 
     public static function clearHistory() as Void {
         _messages = [] as Array<Dictionary>;
         try {
             Storage.deleteValue(STORAGE_KEY);
+            Storage.deleteValue(StorageKeys.BG_PENDING_MESSAGES);
         } catch (e) {
             // ignore
         }

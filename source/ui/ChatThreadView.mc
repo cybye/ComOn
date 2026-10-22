@@ -31,6 +31,8 @@ class ChatThreadView extends WatchUi.View {
         if (onReturnToChat != null) {
             onReturnToChat.invoke();
         }
+        ChatHistoryManager.initializeHistory();
+        ChatHistoryManager.drainBackgroundPendingMessages();
         ChatHistoryManager.markAsRead(targetId);
         WatchUi.requestUpdate();
     }

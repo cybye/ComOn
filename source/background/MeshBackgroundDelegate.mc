@@ -25,6 +25,21 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
 
     function onTemporalEvent() as Void {
         System.println("MeshBackgroundDelegate: onTemporalEvent triggered");
+
+        // Rate limiting guard: prevent runaway loops from hammering the BLE radio or OS watchdog
+        var nowVal = Time.now().value();
+        var lastRunAt = Storage.getValue(StorageKeys.BG_LAST_RUN_AT);
+        if (lastRunAt instanceof Number) {
+            var elapsed = nowVal - (lastRunAt as Number);
+            if (elapsed >= 0 && elapsed < 240) {
+                System.println("Background poll: rapid re-trigger detected (" + elapsed + "s since last run). Throttling.");
+                scheduleTemporalEvent(300);
+                Background.exit(null);
+                return;
+            }
+        }
+        Storage.setValue(StorageKeys.BG_LAST_RUN_AT, nowVal);
+
         if (MeshBackgroundDiagnostics.wasPreviousRunUnfinished()) {
             // Previous poll never completed -> it was killed by the system time limit
             var killedStreak = readFailStreak() + 1;
@@ -40,6 +55,16 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
             System.println("Background check disabled by user setting.");
             MeshBackgroundDiagnostics.finishRun(_runId, "disabled", false, 0);
             Background.deleteTemporalEvent();
+            Background.exit(null);
+            return;
+        }
+
+        // Watch battery safety: stand down if watch battery is critical (< 20%)
+        var sysStats = System.getSystemStats();
+        if (sysStats has :battery && sysStats.battery != null && sysStats.battery < 20.0) {
+            System.println("Background poll: watch battery low (" + sysStats.battery.format("%.1f") + "%), skipping");
+            MeshBackgroundDiagnostics.finishRun(_runId, "low_battery", false, 0);
+            scheduleTemporalEvent(3600);
             Background.exit(null);
             return;
         }
@@ -75,10 +100,12 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
         if (MeshQuietPolicy.isEnabled()) {
             var untilWake = MeshQuietPolicy.secondsUntilWake();
             if (untilWake > 0) {
-                // Single wake-up shortly after the configured wake time, nothing in between
+                // Schedule wake-up moment after the configured wake time, nothing in between
                 System.println("Background poll: sleep window active, next check in " + untilWake + "s");
                 MeshBackgroundDiagnostics.finishRun(_runId, "quiet_sleep", false, 0);
-                completeBackgroundEvent(0, null, null, [] as Array<String>, untilWake + 60);
+                var wakeMoment = Time.now().add(new Time.Duration(untilWake + 60));
+                scheduleMomentEvent(wakeMoment);
+                Background.exit(null);
                 return;
             }
             if (MeshQuietPolicy.isDndActive()) {
@@ -202,21 +229,40 @@ class MeshBackgroundDelegate extends System.ServiceDelegate {
         return (value instanceof String) ? (value as String) : fallback;
     }
 
-    //! Re-registers the recurring temporal event with the given interval and exits.
-    //! A recurring Duration (rather than a one-shot Moment) is used on purpose: if a
-    //! later run dies before rescheduling, the event still keeps firing.
-    private function completeBackgroundEvent(messageCount as Number, lastSender as String?, lastMessage as String?, targetIds as Array<String>, nextIntervalSecs as Number) as Void {
-        var sender = (lastSender != null) ? lastSender : "";
-        var message = (lastMessage != null) ? lastMessage : "";
+    //! Schedules the next temporal event.
+    //! Recurring Duration is used for normal intervals (<= 3600s).
+    //! For large intervals (> 3600s), a one-shot Moment is scheduled instead
+    //! to prevent Garmin OS watchdog/duration overflow or immediate-firing anomalies.
+    private function scheduleTemporalEvent(secs as Number) as Void {
         try {
-            if (nextIntervalSecs > 0) {
-                var secs = (nextIntervalSecs < MIN_TEMPORAL_SECS) ? MIN_TEMPORAL_SECS : nextIntervalSecs;
-                Background.registerForTemporalEvent(new Time.Duration(secs));
+            if (secs > 0) {
+                var safeSecs = (secs < MIN_TEMPORAL_SECS) ? MIN_TEMPORAL_SECS : secs;
+                if (safeSecs > 3600) {
+                    var targetMoment = Time.now().add(new Time.Duration(safeSecs));
+                    Background.registerForTemporalEvent(targetMoment);
+                } else {
+                    Background.registerForTemporalEvent(new Time.Duration(safeSecs));
+                }
             }
         } catch (e) {
             System.println("MeshBackgroundDelegate: reschedule error: " + e.getErrorMessage());
         }
+    }
 
+    //! Schedules a one-shot wake event at a specific calendar Moment (e.g. end of sleep window).
+    private function scheduleMomentEvent(moment as Time.Moment) as Void {
+        try {
+            Background.registerForTemporalEvent(moment);
+        } catch (e) {
+            System.println("MeshBackgroundDelegate: scheduleMoment error: " + e.getErrorMessage());
+        }
+    }
+
+    //! Re-registers the temporal event with the given interval and exits.
+    private function completeBackgroundEvent(messageCount as Number, lastSender as String?, lastMessage as String?, targetIds as Array<String>, nextIntervalSecs as Number) as Void {
+        var sender = (lastSender != null) ? lastSender : "";
+        var message = (lastMessage != null) ? lastMessage : "";
+        scheduleTemporalEvent(nextIntervalSecs);
         Background.exit({ "messageCount" => messageCount, "lastSender" => sender, "lastMessage" => message, "targetIds" => targetIds });
     }
 }
